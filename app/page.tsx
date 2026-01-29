@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Card } from "@/components/ui/card";
 
 export default function Home() {
   return (
@@ -60,6 +61,9 @@ export default function Home() {
           </a>
         </div>
       </main>
+      <Card className="fixed bottom-4 right-4 bg-white/80 dark:bg-black/80 backdrop-blur-md border border-black/10 dark:border-white/10 shadow-lg">
+        <p>What's up</p>
+      </Card>
     </div>
   );
 }
