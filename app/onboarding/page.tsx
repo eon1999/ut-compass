@@ -148,25 +148,28 @@ const isStepValid = (stepIndex: number, formData: OnboardingFormData): boolean =
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<OnboardingFormData>(initialFormData);
-  const [submitted, setSubmitted] = useState(false);
+  const [formData, setFormData] = useState<OnboardingFormData>(() => {
+    if (typeof window === "undefined") {
+      return initialFormData;
+    }
 
-  useEffect(() => {
     const savedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!savedDraft) {
-      return;
+      return initialFormData;
     }
 
     try {
       const parsedDraft = JSON.parse(savedDraft) as Partial<OnboardingFormData>;
-      setFormData((previousData) => ({
-        ...previousData,
+      return {
+        ...initialFormData,
         ...parsedDraft,
-      }));
+      };
     } catch {
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return initialFormData;
     }
-  }, []);
+  });
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (submitted) {
