@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 
+
 type OnboardingFormData = {
   firstName: string;
   lastName: string;
@@ -368,7 +369,7 @@ export default function OnboardingPage() {
       return {
         ...previousData,
         hobbies: hasHobby
-          ? previousData.goals.filter((item) => item !== hobby)
+          ? previousData.hobbies.filter((item) => item !== hobby)
           : [...previousData.hobbies, hobby],
       };
     });
