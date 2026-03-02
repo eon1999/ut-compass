@@ -45,7 +45,6 @@ export default function AuthenticationPage() {
         console.log("Account created:", userCredential.user.uid);
       }
     } catch (err) {
-      // firebase errors often have a code and message
       const message = err instanceof Error ? err.message : JSON.stringify(err);
       setError(message);
     } finally {
