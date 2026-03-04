@@ -1,4 +1,4 @@
-import { handleEventIngest } from "@/lib/pipeline";
+import { handleEventIngest, handleOrganizationIngest } from "@/lib/pipeline";
 
 export async function POST(request: Request) {
     // security check
@@ -9,12 +9,18 @@ export async function POST(request: Request) {
     }
 
     try {
-        const pipelinePromise = handleEventIngest();
-        // no await since we want to return response immediately
-        return new Response("Pipeline started", { status: 200 });
+        const { includeOrganizations } = await request.json();
+
+        await handleEventIngest();
+
+        if (includeOrganizations) {
+            await handleOrganizationIngest();
+        }
+
+        return new Response("Pipeline completed successfully", { status: 200 });
 
     } catch (error) {
-        console.error("Error starting pipeline:", error);
+        console.error("Error executing pipeline:", error);
         return new Response("Internal Server Error", { status: 500 });
     }
 }
