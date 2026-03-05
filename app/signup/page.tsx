@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Mail, Lock, User } from "lucide-react";
 
@@ -11,11 +12,13 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebaseConfig";
 
 const AUTH_PROFILE_STORAGE_KEY = "ut-compass-auth-profile";
 
 export default function AuthenticationPage() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
 
   const [email, setEmail] = useState("");
@@ -53,6 +56,23 @@ export default function AuthenticationPage() {
     );
   };
 
+  const upsertUserDocument = async (profile: {
+    uid: string;
+    name?: string;
+    email?: string;
+  }) => {
+    await setDoc(
+      doc(db, "users", profile.uid),
+      {
+        uid: profile.uid,
+        name: profile.name ?? "",
+        email: profile.email ?? "",
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -67,18 +87,30 @@ export default function AuthenticationPage() {
           name: res.user.displayName ?? undefined,
           email: res.user.email ?? email,
         });
+        await upsertUserDocument({
+          uid: res.user.uid,
+          name: res.user.displayName ?? undefined,
+          email: res.user.email ?? email,
+        });
         console.log("Signed in:", res.user.uid);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         if (auth.currentUser && name) {
           await updateProfile(auth.currentUser, { displayName: name });
         }
+        const finalName = name || userCredential.user.displayName || undefined;
         saveAuthProfile({
-          name: name || userCredential.user.displayName || undefined,
+          name: finalName,
+          email: userCredential.user.email ?? email,
+        });
+        await upsertUserDocument({
+          uid: userCredential.user.uid,
+          name: finalName,
           email: userCredential.user.email ?? email,
         });
         console.log("Account created:", userCredential.user.uid);
       }
+      router.push("/onboarding");
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
       setError(message);
@@ -98,7 +130,13 @@ export default function AuthenticationPage() {
         name: result.user.displayName ?? undefined,
         email: result.user.email ?? undefined,
       });
+      await upsertUserDocument({
+        uid: result.user.uid,
+        name: result.user.displayName ?? undefined,
+        email: result.user.email ?? undefined,
+      });
       console.log("Google sign-in:", result.user.uid);
+      router.push("/onboarding");
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
       setError(message);

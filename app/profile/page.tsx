@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import {
   BookOpen,
   Compass,
@@ -12,16 +12,19 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebaseConfig";
 
 type OnboardingSubmission = {
   firstName: string;
   lastName: string;
   yearClassification: string;
+  school: string;
   major: string;
-  preferredCreditLoad: string;
-  studyStyle: string;
   interests: string[];
-  communityPreference: string;
+  goals: string[];
+  hobbies: string[];
   topGoal: string;
   weeklyAvailability: string;
 };
@@ -43,6 +46,7 @@ type ProfileData = {
   name: string;
   email: string;
   studentYear: string;
+  school: string;
   major: string;
   preferences: ProfilePreferences;
 };
@@ -80,6 +84,132 @@ const safeParse = <T,>(value: string | null): T | null => {
   }
 };
 
+const toStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+
+const emptyProfileData: ProfileData = {
+  name: "",
+  email: "",
+  studentYear: "",
+  school: "",
+  major: "",
+  preferences: {
+    academicInterests: [],
+    preProfessionalAspirations: [],
+    hobbies: [],
+    organizations: [],
+    schoolYearGoal: "",
+  },
+};
+
+const normalizeProfileData = (value: unknown): ProfileData => {
+  if (!value || typeof value !== "object") {
+    return emptyProfileData;
+  }
+
+  const candidate = value as Partial<ProfileData>;
+  const preferences = candidate.preferences;
+  return {
+    name: typeof candidate.name === "string" ? candidate.name : "",
+    email: typeof candidate.email === "string" ? candidate.email : "",
+    studentYear:
+      typeof candidate.studentYear === "string" ? candidate.studentYear : "",
+    school: typeof candidate.school === "string" ? candidate.school : "",
+    major: typeof candidate.major === "string" ? candidate.major : "",
+    preferences: {
+      academicInterests: toStringArray(preferences?.academicInterests),
+      preProfessionalAspirations: toStringArray(
+        preferences?.preProfessionalAspirations,
+      ),
+      hobbies: toStringArray(preferences?.hobbies),
+      organizations: toStringArray(preferences?.organizations),
+      schoolYearGoal:
+        typeof preferences?.schoolYearGoal === "string"
+          ? preferences.schoolYearGoal
+          : "",
+    },
+  };
+};
+
+const normalizeOnboardingSubmission = (value: unknown): OnboardingSubmission => {
+  if (!value || typeof value !== "object") {
+    return {
+      firstName: "",
+      lastName: "",
+      yearClassification: "",
+      school: "",
+      major: "",
+      interests: [],
+      goals: [],
+      hobbies: [],
+      topGoal: "",
+      weeklyAvailability: "",
+    };
+  }
+
+  const candidate = value as Partial<OnboardingSubmission>;
+  return {
+    firstName: typeof candidate.firstName === "string" ? candidate.firstName : "",
+    lastName: typeof candidate.lastName === "string" ? candidate.lastName : "",
+    yearClassification:
+      typeof candidate.yearClassification === "string"
+        ? candidate.yearClassification
+        : "",
+    school: typeof candidate.school === "string" ? candidate.school : "",
+    major: typeof candidate.major === "string" ? candidate.major : "",
+    interests: toStringArray(candidate.interests),
+    goals: toStringArray(candidate.goals),
+    hobbies: toStringArray(candidate.hobbies),
+    topGoal: typeof candidate.topGoal === "string" ? candidate.topGoal : "",
+    weeklyAvailability:
+      typeof candidate.weeklyAvailability === "string"
+        ? candidate.weeklyAvailability
+        : "",
+  };
+};
+
+const profileFromOnboarding = (
+  onboarding: OnboardingSubmission,
+  fallbackName: string,
+  fallbackEmail: string,
+): ProfileData => {
+  const onboardingName =
+    onboarding.firstName && onboarding.lastName
+      ? `${onboarding.firstName} ${onboarding.lastName}`
+      : "";
+
+  return {
+    name: onboardingName || fallbackName,
+    email: fallbackEmail,
+    studentYear: onboarding.yearClassification,
+    school: onboarding.school,
+    major: onboarding.major,
+    preferences: {
+      academicInterests: onboarding.interests,
+      preProfessionalAspirations: onboarding.goals,
+      hobbies: onboarding.hobbies,
+      organizations: [],
+      schoolYearGoal: onboarding.topGoal,
+    },
+  };
+};
+
+const hasProfileData = (profile: ProfileData): boolean =>
+  Boolean(
+    profile.name ||
+      profile.email ||
+      profile.studentYear ||
+      profile.school ||
+      profile.major ||
+      profile.preferences.academicInterests.length ||
+      profile.preferences.preProfessionalAspirations.length ||
+      profile.preferences.hobbies.length ||
+      profile.preferences.organizations.length ||
+      profile.preferences.schoolYearGoal,
+  );
+
 const titleCase = (value: string): string =>
   value
     .split(" ")
@@ -89,26 +219,14 @@ const titleCase = (value: string): string =>
 
 const createInitialProfile = (): ProfileData => {
   if (typeof window === "undefined") {
-    return {
-      name: "",
-      email: "",
-      studentYear: "",
-      major: "",
-      preferences: {
-        academicInterests: [],
-        preProfessionalAspirations: [],
-        hobbies: [],
-        organizations: [],
-        schoolYearGoal: "",
-      },
-    };
+    return emptyProfileData;
   }
 
-  const savedProfile = safeParse<ProfileData>(
+  const savedProfile = safeParse<unknown>(
     window.localStorage.getItem(PROFILE_STORAGE_KEY),
   );
   if (savedProfile) {
-    return savedProfile;
+    return normalizeProfileData(savedProfile);
   }
 
   const onboarding = safeParse<OnboardingSubmission>(
@@ -127,11 +245,12 @@ const createInitialProfile = (): ProfileData => {
     name: authProfile?.name || onboardingName,
     email: authProfile?.email || "",
     studentYear: onboarding?.yearClassification || "",
+    school: onboarding?.school || "",
     major: onboarding?.major || "",
     preferences: {
       academicInterests: onboarding?.interests || [],
-      preProfessionalAspirations: [],
-      hobbies: [],
+      preProfessionalAspirations: onboarding?.goals || [],
+      hobbies: onboarding?.hobbies || [],
       organizations: [],
       schoolYearGoal: onboarding?.topGoal || "",
     },
@@ -140,11 +259,61 @@ const createInitialProfile = (): ProfileData => {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(() => createInitialProfile());
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [academicInterestInput, setAcademicInterestInput] = useState("");
   const [aspirationInput, setAspirationInput] = useState("");
   const [hobbyInput, setHobbyInput] = useState("");
   const [organizationInput, setOrganizationInput] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setAuthUser(user);
+
+      if (!user) {
+        setIsLoadingProfile(false);
+        return;
+      }
+
+      try {
+        const snapshot = await getDoc(doc(db, "users", user.uid));
+        if (!snapshot.exists()) {
+          setProfile((previousData) => ({
+            ...previousData,
+            name: previousData.name || user.displayName || "",
+            email: previousData.email || user.email || "",
+          }));
+          return;
+        }
+
+        const data = snapshot.data();
+        const cloudProfile = normalizeProfileData(data.profile);
+        if (hasProfileData(cloudProfile)) {
+          setProfile(cloudProfile);
+          window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(cloudProfile));
+          return;
+        }
+
+        const onboarding = normalizeOnboardingSubmission(data.onboarding);
+        const profileFromQuiz = profileFromOnboarding(
+          onboarding,
+          user.displayName || "",
+          user.email || "",
+        );
+        setProfile(profileFromQuiz);
+      } catch (error) {
+        console.error("Unable to load profile from Firestore", error);
+        setSaveError("Unable to load your cloud profile. Using local data.");
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const updateProfileField = <K extends keyof ProfileData>(
     key: K,
@@ -218,11 +387,38 @@ export default function ProfilePage() {
     addTag(key, value, clearInput);
   };
 
-  const handleSave = (event: FormEvent) => {
+  const handleSave = async (event: FormEvent) => {
     event.preventDefault();
-    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-    setSaveMessage("Changes saved");
-    window.setTimeout(() => setSaveMessage(""), 2500);
+    setIsSaving(true);
+    setSaveError("");
+    setSaveMessage("");
+
+    try {
+      window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+
+      if (authUser) {
+        await setDoc(
+          doc(db, "users", authUser.uid),
+          {
+            uid: authUser.uid,
+            name: profile.name,
+            email: profile.email,
+            profile,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        );
+        setSaveMessage("Changes saved to Firestore");
+      } else {
+        setSaveMessage("Saved locally. Sign in to sync with Firestore.");
+      }
+    } catch (error) {
+      console.error("Unable to save profile", error);
+      setSaveError("Unable to save changes to Firestore right now.");
+    } finally {
+      setIsSaving(false);
+      window.setTimeout(() => setSaveMessage(""), 2500);
+    }
   };
 
   const renderTagList = (items: string[], key: keyof ProfilePreferences) => (
@@ -297,6 +493,17 @@ export default function ProfilePage() {
             <div className="text-sm text-gray-500">Settings</div>
           </header>
 
+          {isLoadingProfile && (
+            <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Loading profile from Firestore...
+            </div>
+          )}
+          {saveError && (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {saveError}
+            </div>
+          )}
+
           <form onSubmit={handleSave} className="space-y-8">
             <section className="rounded-2xl border border-gray-200 bg-white p-6">
               <h1 className="text-3xl font-semibold">Personal Information</h1>
@@ -337,6 +544,16 @@ export default function ProfilePage() {
                       </option>
                     ))}
                   </select>
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-gray-700">School</span>
+                  <input
+                    type="text"
+                    value={profile.school}
+                    onChange={(event) => updateProfileField("school", event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-[#1d4d8f]"
+                  />
                 </label>
 
                 <label className="space-y-2">
@@ -520,7 +737,7 @@ export default function ProfilePage() {
             <footer className="flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex items-center gap-2 text-sm text-gray-500">
                 <UserRound className="h-4 w-4" />
-                Hydrated from login + onboarding when available
+                Synced with Firestore when signed in
               </div>
               <div className="flex items-center gap-3">
                 {saveMessage && (
@@ -530,10 +747,11 @@ export default function ProfilePage() {
                 )}
                 <button
                   type="submit"
+                  disabled={isSaving || isLoadingProfile}
                   className="inline-flex items-center gap-2 rounded-xl bg-[#8bd6cc] px-5 py-3 font-semibold text-[#123b45] transition hover:bg-[#78c8bc]"
                 >
                   <Save className="h-4 w-4" />
-                  Save Changes
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </footer>

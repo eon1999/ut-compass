@@ -3,6 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebaseConfig";
 
 
 type OnboardingFormData = {
@@ -254,6 +257,48 @@ const hobbyOptions = [
   "Running",
 ];
 
+const weeklyAvailabilityOptions = [
+  "1-3 hours",
+  "4-6 hours",
+  "7-10 hours",
+  "10+ hours",
+];
+
+const toStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+
+const parseOnboardingPayload = (value: unknown): Partial<OnboardingFormData> => {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const candidate = value as Partial<Record<keyof OnboardingFormData, unknown>>;
+  return {
+    firstName: typeof candidate.firstName === "string" ? candidate.firstName : "",
+    lastName: typeof candidate.lastName === "string" ? candidate.lastName : "",
+    yearClassification:
+      typeof candidate.yearClassification === "string"
+        ? candidate.yearClassification
+        : "",
+    school: typeof candidate.school === "string" ? candidate.school : "",
+    major: typeof candidate.major === "string" ? candidate.major : "",
+    interests: toStringArray(candidate.interests),
+    goals: toStringArray(candidate.goals),
+    hobbies: toStringArray(candidate.hobbies),
+    communityPreference:
+      typeof candidate.communityPreference === "string"
+        ? candidate.communityPreference
+        : "",
+    topGoal: typeof candidate.topGoal === "string" ? candidate.topGoal : "",
+    weeklyAvailability:
+      typeof candidate.weeklyAvailability === "string"
+        ? candidate.weeklyAvailability
+        : "",
+  };
+};
+
 const isStepValid = (stepIndex: number, formData: OnboardingFormData): boolean => {
   switch (stepIndex) {
     case 0:
@@ -274,7 +319,7 @@ const isStepValid = (stepIndex: number, formData: OnboardingFormData): boolean =
       );
     case 3:
       return Boolean(
-        formData.hobbies.length > 0,
+        formData.hobbies.length > 0 && formData.topGoal.trim() && formData.weeklyAvailability,
       );
     case 4:
       return true;
@@ -308,6 +353,11 @@ export default function OnboardingPage() {
     }
   });
   const [submitted, setSubmitted] = useState(false);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [isHydrating, setIsHydrating] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [syncMessage, setSyncMessage] = useState("");
 
   // list of majors that corresponds to the chosen school
   const availableMajors: string[] = useMemo(() => {
@@ -315,6 +365,40 @@ export default function OnboardingPage() {
     // index cast to avoid implicit any
     return (schoolOptions as Record<string, string[]>)[formData.school] || [];
   }, [formData.school]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setAuthUser(user);
+
+      if (!user) {
+        setIsHydrating(false);
+        return;
+      }
+
+      try {
+        const snapshot = await getDoc(doc(db, "users", user.uid));
+        if (!snapshot.exists()) {
+          return;
+        }
+
+        const data = snapshot.data();
+        const cloudOnboarding = parseOnboardingPayload(data.onboarding);
+        if (Object.values(cloudOnboarding).some(Boolean)) {
+          setFormData((previousData) => ({
+            ...previousData,
+            ...cloudOnboarding,
+          }));
+        }
+      } catch (error) {
+        console.error("Unable to load onboarding from Firestore", error);
+        setSyncError("Unable to load your cloud onboarding data.");
+      } finally {
+        setIsHydrating(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (submitted) {
@@ -397,20 +481,67 @@ export default function OnboardingPage() {
     setCurrentStep((previousStep) => previousStep + 1);
   };
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!canContinue) {
       return;
     }
+
+    setIsSaving(true);
+    setSyncError("");
+    setSyncMessage("");
 
     const payload = {
       ...formData,
       submittedAt: new Date().toISOString(),
     };
 
-    window.localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
-    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setSubmitted(true);
+    try {
+      window.localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+
+      if (authUser) {
+        const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+        await setDoc(
+          doc(db, "users", authUser.uid),
+          {
+            uid: authUser.uid,
+            name: fullName || authUser.displayName || "",
+            email: authUser.email || "",
+            onboarding: {
+              ...formData,
+              submittedAt: serverTimestamp(),
+            },
+            profile: {
+              name: fullName || authUser.displayName || "",
+              email: authUser.email || "",
+              studentYear: formData.yearClassification,
+              school: formData.school,
+              major: formData.major,
+              preferences: {
+                academicInterests: formData.interests,
+                preProfessionalAspirations: formData.goals,
+                hobbies: formData.hobbies,
+                organizations: [],
+                schoolYearGoal: formData.topGoal,
+              },
+            },
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        );
+        setSyncMessage("Onboarding synced to Firestore.");
+      } else {
+        setSyncMessage("Saved locally. Sign in to sync this onboarding.");
+      }
+
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Unable to save onboarding", error);
+      setSyncError("Unable to save onboarding to Firestore right now.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (submitted) {
@@ -425,6 +556,11 @@ export default function OnboardingPage() {
             to your profile or restart onboarding if you want to edit your
             answers.
           </p>
+          {syncMessage && (
+            <p className="mt-4 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
+              {syncMessage}
+            </p>
+          )}
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
@@ -466,6 +602,7 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={handleBack}
+            disabled={isSaving}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 transition hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -511,6 +648,21 @@ export default function OnboardingPage() {
             {steps[currentStep].title}
           </h1>
           <p className="mt-3 text-gray-600">{steps[currentStep].description}</p>
+          {isHydrating && (
+            <p className="mt-4 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Loading your saved onboarding from Firestore...
+            </p>
+          )}
+          {!isHydrating && !authUser && (
+            <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              You are not signed in. Your progress will only be saved locally.
+            </p>
+          )}
+          {syncError && (
+            <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {syncError}
+            </p>
+          )}
 
           <form className="mt-10 space-y-8" onSubmit={handleSubmit}>
             {currentStep === 0 && (
@@ -661,30 +813,62 @@ export default function OnboardingPage() {
 
             {currentStep === 3 && (
               <div className="space-y-6">
-                <p className="text-sm font-medium text-gray-500 mb2">Add current organizations functionality</p>
-                  <div className="space-y-2">
-                    {hobbyOptions.map((option) => {
-                      const checked = formData.hobbies.includes(option);
-                      return (
-                        <label
-                          key={option}
-                          className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
-                            checked
-                              ? "border-blue-700 bg-blue-50"
-                              : "border-gray-300 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleHobby(option)}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-700"
-                          />
-                          <span className="text-sm text-gray-800">{option}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                <p className="text-sm font-medium text-gray-700">Select your hobbies</p>
+                <div className="space-y-2">
+                  {hobbyOptions.map((option) => {
+                    const checked = formData.hobbies.includes(option);
+                    return (
+                      <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                          checked
+                            ? "border-blue-700 bg-blue-50"
+                            : "border-gray-300 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleHobby(option)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-700"
+                        />
+                        <span className="text-sm text-gray-800">{option}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Top goal this school year
+                  </span>
+                  <textarea
+                    value={formData.topGoal}
+                    onChange={(event) => updateField("topGoal", event.target.value)}
+                    placeholder="Example: Join 2 orgs and keep a 3.5 GPA."
+                    className="min-h-24 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-blue-700"
+                  />
+                </label>
+
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Weekly time available for campus involvement
+                  </span>
+                  <select
+                    value={formData.weeklyAvailability}
+                    onChange={(event) =>
+                      updateField("weeklyAvailability", event.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-blue-700"
+                  >
+                    <option value="">Select weekly availability</option>
+                    {weeklyAvailabilityOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             )}
 
@@ -711,14 +895,16 @@ export default function OnboardingPage() {
                     <dd>{formData.major}</dd>
                   </div>
                   <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
-                    <dt className="font-medium text-gray-500">Interests</dt>
+                    <dt className="font-medium text-gray-500">Academic Interests</dt>
                     <dd>{formData.interests.join(", ")}</dd>
                   </div>
                   <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
-                    <dt className="font-medium text-gray-500">
-                      Community preference
-                    </dt>
-                    <dd>{formData.communityPreference}</dd>
+                    <dt className="font-medium text-gray-500">Career Goals</dt>
+                    <dd>{formData.goals.join(", ")}</dd>
+                  </div>
+                  <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
+                    <dt className="font-medium text-gray-500">Hobbies</dt>
+                    <dd>{formData.hobbies.join(", ")}</dd>
                   </div>
                   <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
                     <dt className="font-medium text-gray-500">Top goal</dt>
@@ -741,7 +927,7 @@ export default function OnboardingPage() {
                 <button
                   type="button"
                   onClick={handleContinue}
-                  disabled={!canContinue}
+                  disabled={!canContinue || isHydrating || isSaving}
                   className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 >
                   Next
@@ -750,9 +936,10 @@ export default function OnboardingPage() {
               ) : (
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white transition hover:bg-blue-700"
+                  disabled={isHydrating || isSaving}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 >
-                  Finish onboarding
+                  {isSaving ? "Saving..." : "Finish onboarding"}
                   <Check className="h-4 w-4" />
                 </button>
               )}
