@@ -4,7 +4,6 @@ import { FormEvent, KeyboardEvent, useState } from "react";
 import {
   BookOpen,
   Compass,
-  GraduationCap,
   Heart,
   Save,
   Search,
