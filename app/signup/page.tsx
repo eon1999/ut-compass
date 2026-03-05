@@ -13,6 +13,8 @@ import {
 } from "firebase/auth";
 import { auth } from "../../lib/firebase";
 
+const AUTH_PROFILE_STORAGE_KEY = "ut-compass-auth-profile";
+
 export default function AuthenticationPage() {
   const [isLogin, setIsLogin] = useState(true);
 
@@ -26,6 +28,31 @@ export default function AuthenticationPage() {
 
   const [error, setError] = useState("");
 
+  const saveAuthProfile = (profile: { name?: string; email?: string }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const existingRaw = window.localStorage.getItem(AUTH_PROFILE_STORAGE_KEY);
+    let existing: { name?: string; email?: string } = {};
+
+    if (existingRaw) {
+      try {
+        existing = JSON.parse(existingRaw) as { name?: string; email?: string };
+      } catch {
+        existing = {};
+      }
+    }
+
+    window.localStorage.setItem(
+      AUTH_PROFILE_STORAGE_KEY,
+      JSON.stringify({
+        name: profile.name ?? existing.name ?? "",
+        email: profile.email ?? existing.email ?? "",
+      }),
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -36,12 +63,20 @@ export default function AuthenticationPage() {
     try {
       if (isLogin) {
         const res = await signInWithEmailAndPassword(auth, email, password);
+        saveAuthProfile({
+          name: res.user.displayName ?? undefined,
+          email: res.user.email ?? email,
+        });
         console.log("Signed in:", res.user.uid);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         if (auth.currentUser && name) {
           await updateProfile(auth.currentUser, { displayName: name });
         }
+        saveAuthProfile({
+          name: name || userCredential.user.displayName || undefined,
+          email: userCredential.user.email ?? email,
+        });
         console.log("Account created:", userCredential.user.uid);
       }
     } catch (err) {
@@ -59,6 +94,10 @@ export default function AuthenticationPage() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      saveAuthProfile({
+        name: result.user.displayName ?? undefined,
+        email: result.user.email ?? undefined,
+      });
       console.log("Google sign-in:", result.user.uid);
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
