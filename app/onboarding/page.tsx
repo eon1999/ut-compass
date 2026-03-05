@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Compass } from "lucide-react";
+
 
 
 type OnboardingFormData = {
@@ -455,8 +456,8 @@ export default function OnboardingPage() {
   return (
    <main className="min-h-screen bg-[#f4f4f6] lg:grid lg:grid-cols-2">
       <section className="hidden bg-[#d9d9db] p-10 lg:flex lg:flex-col">
-        <div className="inline-flex items-center gap-3 text-xl font-semibold text-[#23395d]">
-          <span className="h-8 w-8 rounded-full bg-white/75" />
+        <div className="inline-flex items-center gap-2 text-2xl font-semibold text-[#1d4d8f]">
+          <Compass className="h-7 w-7" />
           UT Compass
         </div>
       </section>
