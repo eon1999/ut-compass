@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Mail, Lock, User } from "lucide-react";
 
@@ -10,10 +11,21 @@ import {
   updateProfile,
   signInWithPopup,
   GoogleAuthProvider,
+  type User as FirebaseUser,
 } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import { auth } from "@/lib/firebaseConfig";
+import {
+  mergeUserProfiles,
+  profileFromAuthUser,
+  profileFromOnboarding,
+  readOnboardingSubmissionFromLocalStorage,
+  readProfileFromLocalStorage,
+  writeProfileToLocalStorage,
+} from "@/lib/profile";
+import { upsertProfileToFirestore } from "@/lib/profileFirestore";
 
 export default function AuthenticationPage() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
 
   const [email, setEmail] = useState("");
@@ -26,6 +38,23 @@ export default function AuthenticationPage() {
 
   const [error, setError] = useState("");
 
+  const syncProfileForUser = async (user: FirebaseUser) => {
+    const onboardingSubmission = readOnboardingSubmissionFromLocalStorage();
+    const mergedProfile = mergeUserProfiles(
+      onboardingSubmission ? profileFromOnboarding(onboardingSubmission) : null,
+      readProfileFromLocalStorage(),
+      profileFromAuthUser(user),
+    );
+
+    writeProfileToLocalStorage(mergedProfile);
+
+    try {
+      await upsertProfileToFirestore(user.uid, mergedProfile);
+    } catch (firestoreError) {
+      console.error("Failed to sync auth profile to Firestore:", firestoreError);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -36,13 +65,21 @@ export default function AuthenticationPage() {
     try {
       if (isLogin) {
         const res = await signInWithEmailAndPassword(auth, email, password);
+        await syncProfileForUser(res.user);
         console.log("Signed in:", res.user.uid);
+        router.push("/profile");
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
         if (auth.currentUser && name) {
           await updateProfile(auth.currentUser, { displayName: name });
         }
+        await syncProfileForUser(auth.currentUser ?? userCredential.user);
         console.log("Account created:", userCredential.user.uid);
+        router.push("/onboarding");
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
@@ -59,7 +96,9 @@ export default function AuthenticationPage() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      await syncProfileForUser(result.user);
       console.log("Google sign-in:", result.user.uid);
+      router.push("/profile");
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
       setError(message);

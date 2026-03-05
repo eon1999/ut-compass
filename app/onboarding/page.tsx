@@ -3,6 +3,13 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { auth } from "@/lib/firebaseConfig";
+import {
+  ONBOARDING_DRAFT_STORAGE_KEY,
+  ONBOARDING_SUBMISSION_STORAGE_KEY,
+  profileFromOnboarding,
+} from "@/lib/profile";
+import { upsertProfileToFirestore } from "@/lib/profileFirestore";
 
 
 type OnboardingFormData = {
@@ -27,8 +34,8 @@ type Step = {
   description: string;
 };
 
-const DRAFT_STORAGE_KEY = "ut-compass-onboarding-draft";
-const SUBMISSION_STORAGE_KEY = "ut-compass-onboarding-submission";
+const DRAFT_STORAGE_KEY = ONBOARDING_DRAFT_STORAGE_KEY;
+const SUBMISSION_STORAGE_KEY = ONBOARDING_SUBMISSION_STORAGE_KEY;
 
 const steps: Step[] = [
   {
@@ -397,7 +404,7 @@ export default function OnboardingPage() {
     setCurrentStep((previousStep) => previousStep + 1);
   };
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!canContinue) {
       return;
@@ -410,6 +417,21 @@ export default function OnboardingPage() {
 
     window.localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        await upsertProfileToFirestore(currentUser.uid, {
+          ...profileFromOnboarding(payload),
+          uid: currentUser.uid,
+          email: currentUser.email ?? undefined,
+          displayName: currentUser.displayName ?? undefined,
+        });
+      } catch (error) {
+        console.error("Failed to sync onboarding profile to Firestore:", error);
+      }
+    }
+
     setSubmitted(true);
   };
 
