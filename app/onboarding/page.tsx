@@ -15,9 +15,6 @@ type OnboardingFormData = {
   interests: string[];
   goals: string[];
   hobbies: string[];
-  communityPreference: string;
-  topGoal: string;
-  weeklyAvailability: string;
 };
 
 
@@ -73,9 +70,6 @@ const initialFormData: OnboardingFormData = {
   interests: [],
   goals: [],
   hobbies: [],
-  communityPreference: "",
-  topGoal: "",
-  weeklyAvailability: "",
 };
 
 
@@ -714,20 +708,6 @@ export default function OnboardingPage() {
                   <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
                     <dt className="font-medium text-gray-500">Interests</dt>
                     <dd>{formData.interests.join(", ")}</dd>
-                  </div>
-                  <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
-                    <dt className="font-medium text-gray-500">
-                      Community preference
-                    </dt>
-                    <dd>{formData.communityPreference}</dd>
-                  </div>
-                  <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
-                    <dt className="font-medium text-gray-500">Top goal</dt>
-                    <dd>{formData.topGoal}</dd>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <dt className="font-medium text-gray-500">Weekly time</dt>
-                    <dd>{formData.weeklyAvailability}</dd>
                   </div>
                 </dl>
               </div>

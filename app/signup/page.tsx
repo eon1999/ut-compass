@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import { useRouter } from "next/navigation";
 import { Mail, Lock, User } from "lucide-react";
 
 import {
@@ -25,6 +25,8 @@ export default function AuthenticationPage() {
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
+
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,6 +175,7 @@ export default function AuthenticationPage() {
 
           <button
             type="submit"
+            onClick={() => router.push(isLogin ? "/" : "/onboarding")}
             disabled={loading}
             className="w-full bg-black text-white font-semibold py-2 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
