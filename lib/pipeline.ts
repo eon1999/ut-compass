@@ -18,7 +18,7 @@ import {
 } from "@/lib/db/pushToFirestore";
 import { db } from "@/lib/db/firebaseAdmin";
 
-export async function handleEventIngest() {
+export async function handleEventIngest(overwrite = false) {
   console.log("Starting event ingestion pipeline...");
 
   // we need to get all organizations first so we can pass their descriptions
@@ -41,10 +41,18 @@ export async function handleEventIngest() {
     // enrich dat thang
     for (const rawEvent of rawEvents) {
       try {
-        const existingDoc = await db.collection("events").doc(`evt_${rawEvent.id}`).get();
-        if (existingDoc.exists) {
-          console.log(`Event with ID evt_${rawEvent.id} already exists. Skipping enrichment and Firestore push.`);
-          continue;
+        const docId = `${rawEvent.id}`;
+        if (!overwrite) {
+          const existingDoc = await db.collection("events").doc(docId).get();
+          console.log(
+            `Checking if event with ID ${docId} already exists in Firestore...`,
+          );
+          if (existingDoc.exists) {
+            console.log(
+              `Event with ID ${docId} already exists. Skipping enrichment and Firestore push.`,
+            );
+            continue;
+          }
         }
         // enrich the event data by calling our ml service
         const enrichedEvent = await enrichEventData(rawEvent);
@@ -53,7 +61,10 @@ export async function handleEventIngest() {
       } catch (error) {
         failureCount++;
         failedEvents.push(rawEvent.id);
-        console.error(`Failed to process event with ID ${rawEvent.id}:`, error);
+        console.error(
+          `Failed to process event with HornsLink ID ${rawEvent.id}:`,
+          error,
+        );
       }
     }
 
@@ -76,9 +87,14 @@ export async function handleOrganizationIngest() {
 
     // no need to enrich org data, just push to firestore
     for (const rawOrg of rawOrgs) {
-      const existingDoc = await db.collection("organizations").doc(`org_${rawOrg.id}`).get();
+      const existingDoc = await db
+        .collection("organizations")
+        .doc(`org_${rawOrg.id}`)
+        .get();
       if (existingDoc.exists) {
-        console.log(`Organization with ID org_${rawOrg.id} already exists. Skipping Firestore push.`);
+        console.log(
+          `Organization with ID org_${rawOrg.id} already exists. Skipping Firestore push.`,
+        );
         continue;
       }
       await pushOrganizationToFireStore(rawOrg);

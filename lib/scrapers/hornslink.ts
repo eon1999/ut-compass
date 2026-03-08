@@ -115,6 +115,7 @@ export async function scrapeHornsLinkEvents() {
 
 export async function scrapeHornsLinkOrganizations() {
   const hornslinkUrl = "https://utexas.campuslabs.com/engage/api/discovery/search/organizations?orderBy%5B0%5D=UpperName%20asc&top=99999&filter=&query=&skip=0"
+  console.log("Fetching organizations from HornsLink...");
   const response = await undiciFetch(hornslinkUrl, {
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36",

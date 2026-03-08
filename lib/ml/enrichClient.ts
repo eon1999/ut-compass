@@ -1,18 +1,18 @@
-// This file is responsible for enriching event data by calling the Hugging Face API to get embeddings and categories for the event.
+// This file is responsible for enriching event data by calling the OpenRouter API to get categories for the event.
 // It will be used in the event ingestion pipeline to enhance the event data before it is stored in the database.
 
-// we're pivoting to chatgpt wrapper since zero-shot seems pretty inconsistent
-
 import OpenAI from "openai";
-import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { pullOrganizationsFromFirestore } from "@/lib/db/pullFromFirestore";
 
+const MODEL = "arcee-ai/trinity-large-preview:free";
+
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
 });
 
-// define categories
+// general event type categories
 export const EVENT_CATEGORIES = [
   "technologyAndEngineering",
   "politicsAndAdvocacy",
@@ -30,8 +30,27 @@ export const EVENT_CATEGORIES = [
   "gamingAndEsports",
 ] as const;
 
-// make event weight schema using zod
-const EventWeightSchema = z.object({
+// major group categories
+export const MAJOR_CATEGORIES = [
+  "computerScience",
+  "electricalEngineering",
+  "mechanicalEngineering",
+  "civilEngineering",
+  "chemicalEngineering",
+  "aerospaceEngineering",
+  "biologyAndPreMed",
+  "chemistry",
+  "physics",
+  "mathematics",
+  "psychology",
+  "businessAndFinance",
+  "economics",
+  "communicationsAndMedia",
+  "nursing",
+] as const;
+
+// zod schemas — nested to match the database schema
+const CategoryWeightSchema = z.object({
   technologyAndEngineering: z.number().min(0).max(1),
   politicsAndAdvocacy: z.number().min(0).max(1),
   academicAndResearch: z.number().min(0).max(1),
@@ -48,6 +67,29 @@ const EventWeightSchema = z.object({
   gamingAndEsports: z.number().min(0).max(1),
 });
 
+const MajorWeightSchema = z.object({
+  computerScience: z.number().min(0).max(1),
+  electricalEngineering: z.number().min(0).max(1),
+  mechanicalEngineering: z.number().min(0).max(1),
+  civilEngineering: z.number().min(0).max(1),
+  chemicalEngineering: z.number().min(0).max(1),
+  aerospaceEngineering: z.number().min(0).max(1),
+  biologyAndPreMed: z.number().min(0).max(1),
+  chemistry: z.number().min(0).max(1),
+  physics: z.number().min(0).max(1),
+  mathematics: z.number().min(0).max(1),
+  psychology: z.number().min(0).max(1),
+  businessAndFinance: z.number().min(0).max(1),
+  economics: z.number().min(0).max(1),
+  communicationsAndMedia: z.number().min(0).max(1),
+  nursing: z.number().min(0).max(1),
+});
+
+const EventWeightSchema = z.object({
+  categories: CategoryWeightSchema,
+  majors: MajorWeightSchema,
+});
+
 // typescript my beloved
 interface IncomingEvent {
   id: string;
@@ -56,7 +98,7 @@ interface IncomingEvent {
     descriptionText: string;
     categories: string[];
     [key: string]: string | string[] | number | boolean | null | undefined;
-  }
+  };
   organization: {
     name: string;
     id: string;
@@ -81,20 +123,20 @@ export async function enrichEventData(incomingEvent: IncomingEvent) {
   const { title, descriptionText, categories } = incomingEvent.content;
   const { organization } = incomingEvent;
   const organizations = await getOrganizations();
-  
+
   if (!organization) {
     throw new Error("Organization data is missing from incoming event");
   }
-  
+
   const organizationDescription =
     organizations[organization.id]?.description || "No description available.";
 
-  // cook up some prompt engineering magic
-  // we  will pull event organization description from
   const prompt = `
     You are a university event classifier. Given the following event details, score the event
     against each category from 0 to 1, where 0 is not relevant at all, and 1 is very relevant.
     Multiple categories can be relevant for a single event, so score each category independently based on the event details.
+    The major group categories (computerScience, electricalEngineering, etc.) represent how relevant this event
+    is to students in those fields of study.
     
     Event Title: ${title}
     Event Description: ${descriptionText}
@@ -102,33 +144,42 @@ export async function enrichEventData(incomingEvent: IncomingEvent) {
     Event Organizer Description: ${organizationDescription}
     Event Reported Categories: ${categories.join(", ")}
     
-    Be sure to only respond with category weights in JSON format, and do not include any additional text`;
+    Respond only with a JSON object with exactly two top-level keys: "categories" and "majors".
+    Each must be an object with float values between 0 and 1.
+    "categories" keys: technologyAndEngineering, politicsAndAdvocacy, academicAndResearch, careerAndNetworking,
+    artsAndPerformance, music, socialAndCommunity, culturalAndInternational, healthAndWellness,
+    sportsAndRecreation, foodAndDrinks, faithAndSpirituality, volunteerAndService, gamingAndEsports.
+    "majors" keys: computerScience, electricalEngineering, mechanicalEngineering, civilEngineering, chemicalEngineering,
+    aerospaceEngineering, biologyAndPreMed, chemistry, physics, mathematics, psychology,
+    businessAndFinance, economics, communicationsAndMedia, nursing.`;
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-5-nano",
+      model: MODEL,
       messages: [
         {
           role: "user",
           content: prompt,
         },
       ],
-      response_format: zodResponseFormat(EventWeightSchema, "event_weight"),
+      response_format: { type: "json_object" },
     });
-
-    // append the category weights to our event data
 
     const content = response.choices[0]?.message?.content;
 
     if (!content) {
-      throw new Error("No content received from OpenAI response");
+      throw new Error("No content received from OpenRouter response");
     }
 
     const weights = EventWeightSchema.parse(JSON.parse(content));
 
     const enrichedEvent = {
       ...incomingEvent,
-      weights: weights,
+      weights: {
+        categories: weights.categories,
+        majors: weights.majors,
+        model: MODEL,
+      },
     };
 
     return enrichedEvent;
