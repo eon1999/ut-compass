@@ -37,14 +37,14 @@ export default function AuthenticationPage() {
 
     try {
       if (isLogin) {
-        const res = await signInWithEmailAndPassword(auth, email, password);
-        console.log("Signed in:", res.user.uid);
+        await signInWithEmailAndPassword(auth, email, password);
+        router.push("/");
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         if (auth.currentUser && name) {
           await updateProfile(auth.currentUser, { displayName: name });
         }
-        console.log("Account created:", userCredential.user.uid);
+        router.push("/onboarding");
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
@@ -60,8 +60,8 @@ export default function AuthenticationPage() {
 
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      console.log("Google sign-in:", result.user.uid);
+      await signInWithPopup(auth, provider);
+      router.push("/");
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
       setError(message);
@@ -175,7 +175,6 @@ export default function AuthenticationPage() {
 
           <button
             type="submit"
-            onClick={() => router.push(isLogin ? "/" : "/onboarding")}
             disabled={loading}
             className="w-full bg-black text-white font-semibold py-2 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

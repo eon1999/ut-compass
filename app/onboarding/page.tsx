@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Compass } from "lucide-react";
-import { db } from "@/lib/db/firebaseAdmin";
+import { auth } from "@/lib/firebase";
 
 
 type OnboardingFormData = {
@@ -303,6 +303,7 @@ export default function OnboardingPage() {
     }
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // list of majors that corresponds to the chosen school
   const availableMajors: string[] = useMemo(() => {
@@ -318,6 +319,15 @@ export default function OnboardingPage() {
 
     window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(formData));
   }, [formData, submitted]);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user && !submitted) {
+        router.push("/signup");
+      }
+    });
+    return () => unsubscribe();
+  }, [router, submitted]);
 
   const canContinue = useMemo(
     () => isStepValid(currentStep, formData),
@@ -394,23 +404,39 @@ export default function OnboardingPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!canContinue) {
+    if (!canContinue) return;
+
+    const user = auth.currentUser;
+    if (!user) {
+      router.push("/signup");
       return;
     }
 
-    const payload = {
-      ...formData,
-      submittedAt: new Date().toISOString(),
-    };
+    setSubmitError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ onboarding: formData }),
+      });
 
-    await db
-      .collection("onboardingSubmissions")
-      .doc(payload.email)
-      .set(payload);
+      if (!res.ok) {
+        const text = await res.text();
+        setSubmitError(text || "Failed to save. Please try again.");
+        return;
+      }
 
-    window.localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
-    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setSubmitted(true);
+      const payload = { ...formData, submittedAt: new Date().toISOString() };
+      window.localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong.");
+    }
   };
 
   if (submitted) {
@@ -715,6 +741,12 @@ export default function OnboardingPage() {
                     <dd>{formData.interests.join(", ")}</dd>
                   </div>
                 </dl>
+              </div>
+            )}
+
+            {submitError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
               </div>
             )}
 

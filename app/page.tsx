@@ -1,6 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// --- API event shape (from getEventsFromFirestore / hornslink) ---
+interface ApiEvent {
+  id: string;
+  content?: {
+    title?: string;
+    descriptionText?: string;
+    location?: string;
+    startTime?: string;
+    endTime?: string;
+    categories?: string[];
+    theme?: string;
+    imageUrl?: string | null;
+  };
+  organization?: { name?: string; id?: string };
+}
 
 // --- Types ---
 type CommitmentLevel = "High Commitment" | "Medium Commitment" | "Low Commitment";
@@ -106,6 +122,52 @@ const mockUpcoming: UpcomingEvent[] = [
   { id: "3", title: "Longhorn Networking Night", priority: "Low Priority", time: "January 29th at 4:30 PM", location: "GSB Atrium" },
   { id: "4", title: "STEM Career Showcase", priority: "Medium Priority", time: "February 2nd at 11:00 AM", location: "" },
 ];
+
+function formatEventDate(isoString: string | undefined): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined });
+  } catch {
+    return "";
+  }
+}
+
+function formatEventTime(isoString: string | undefined): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function apiEventToEventCard(ev: ApiEvent): EventCard {
+  const content = ev.content ?? {};
+  const categories = content.categories ?? (content.theme ? [content.theme] : []);
+  return {
+    id: ev.id,
+    title: content.title ?? "Untitled Event",
+    date: formatEventDate(content.startTime ?? content.endTime),
+    location: content.location ?? "",
+    description: content.descriptionText ?? "",
+    commitment: "Low Commitment",
+    tags: categories.slice(0, 5).map((label) => ({ label })),
+    imageUrl: content.imageUrl ?? undefined,
+  };
+}
+
+function apiEventToUpcoming(ev: ApiEvent): UpcomingEvent {
+  const content = ev.content ?? {};
+  return {
+    id: ev.id,
+    title: content.title ?? "Untitled Event",
+    priority: "Medium Priority",
+    time: formatEventTime(content.startTime),
+    location: content.location ?? "",
+  };
+}
 
 // --- Sub-components ---
 
@@ -286,6 +348,38 @@ function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
 
 // --- Page ---
 export default function Page() {
+  const [cards, setCards] = useState<EventCard[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEvents = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/events");
+      if (!res.ok) throw new Error("Failed to load events");
+      const data = (await res.json()) as ApiEvent[];
+      setCards(data.map(apiEventToEventCard));
+      const sorted = [...data].sort((a, b) => {
+        const aTime = a.content?.startTime ?? "";
+        const bTime = b.content?.startTime ?? "";
+        return aTime.localeCompare(bTime);
+      });
+      setUpcoming(sorted.slice(0, 5).map(apiEventToUpcoming));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      setCards([]);
+      setUpcoming([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <Sidebar user={mockUser} />
@@ -309,13 +403,28 @@ export default function Page() {
         <div className="flex gap-6 px-8 pb-8 flex-1">
           {/* Cards grid */}
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 content-start">
-            {mockCards.map((card) => (
+            {loading && (
+              <p className="col-span-full text-gray-500 py-8">Loading events...</p>
+            )}
+            {error && (
+              <div className="col-span-full py-8">
+                <p className="text-red-600 mb-2">{error}</p>
+                <button
+                  type="button"
+                  onClick={fetchEvents}
+                  className="text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+            {!loading && !error && cards.map((card) => (
               <EventCardItem key={card.id} card={card} />
             ))}
           </div>
 
           {/* Upcoming events */}
-          <UpcomingEventsPanel events={mockUpcoming} />
+          <UpcomingEventsPanel events={upcoming} />
         </div>
       </div>
     </div>
