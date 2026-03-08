@@ -1,5 +1,15 @@
 import { db } from "./firebaseAdmin";
 
+export async function getEventsFromFirestore() {
+  const snapshot = await db.collection("events").get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function getOrganizationsFromFirestore() {
+  const snapshot = await db.collection("organizations").get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
 export async function pullOrganizationsFromFirestore(): Promise<
   Record<string, { description: string }>
 > {
