@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, setDoc, arrayRemove } from "firebase/firestore";
+import { Compass, Calendar, MapPin, House, Fish, Settings } from "lucide-react";
 import { db } from "@/lib/firebase";
 
 interface Tag {
@@ -95,17 +96,16 @@ function Sidebar({ user }: { user: User }) {
   const pathname = usePathname();
 
   const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: "🏠", route: "/home" },
-    { id: "saved", label: "Your Saved", icon: "🎣", route: "/saved" },
+    { id: "dashboard", label: "Dashboard", icon: House, route: "/home" },
+    { id: "saved", label: "Your Saved", icon: Fish, route: "/saved" },
+    { id: "settings", label: "Settings", icon: Settings, route: "/profile"},
   ];
 
   return (
     <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
-      <div className="flex items-center gap-2 mb-10 px-2">
-        <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-white font-bold text-sm">
-          🧭
-        </div>
-        <span className="text-xl font-bold text-blue-900">UT Compass</span>
+      <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
+        <Compass className="h-7 w-7"></Compass>
+        <span className="text-xl font-bold">UT Compass</span>
       </div>
 
       <nav className="flex flex-col gap-2">
@@ -119,7 +119,7 @@ function Sidebar({ user }: { user: User }) {
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            <span>{item.icon}</span>
+            <item.icon className="h-4 w-4" />
             {item.label}
           </button>
         ))}
@@ -191,8 +191,14 @@ function SavedEventCard({
         <h3 className="font-bold text-gray-900 text-base leading-snug">{card.title}</h3>
 
         <div className="flex flex-col gap-1 text-xs text-blue-600">
-          <span>📅 {card.date}</span>
-          <span>📍 {card.location}</span>
+          <span className="flex items-center gap-1">
+              <Calendar className="h-4 w-4"></Calendar>
+              {card.date}
+          </span>
+          <span className="flex items-center gap-1">
+            <MapPin className="h-4 w-4"></MapPin>
+            {card.location}
+          </span>
         </div>
 
         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>

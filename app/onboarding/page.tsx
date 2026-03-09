@@ -457,8 +457,8 @@ export default function OnboardingPage() {
 
   return (
    <main className="min-h-screen bg-[#f4f4f6] lg:grid lg:grid-cols-2">
-      <section className="hidden bg-[#d9d9db] p-10 lg:flex lg:flex-col">
-        <div className="inline-flex items-center gap-2 text-2xl font-semibold text-[#1d4d8f]">
+      <section className="hidden bg-blue-900 p-10 lg:flex lg:flex-col">
+        <div className="inline-flex items-center gap-2 text-2xl font-semibold text-[#f4f4f6]">
           <Compass className="h-7 w-7" />
           UT Compass
         </div>

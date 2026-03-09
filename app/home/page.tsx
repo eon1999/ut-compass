@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, arrayUnion, arrayRemove, setDoc } from "firebase/firestore";
+import { Compass, Calendar, MapPin, House, Fish, Settings, Eye, User } from "lucide-react";
 import { db } from "@/lib/firebase";
 
 interface Tag {
@@ -71,19 +72,18 @@ function Sidebar({ user }: { user: User }) {
   const pathname = usePathname();
 
   const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: "🏠", route: "/home" },
-    { id: "saved", label: "Your Saved", icon: "🔖", route: "/saved" },
-    { id: "settings", label: "Settings", icon: "⚙️", route: "/profile"},
+    { id: "dashboard", label: "Dashboard", icon: House, route: "/home" },
+    { id: "saved", label: "Your Saved", icon: Fish, route: "/saved" },
+    { id: "settings", label: "Settings", icon: Settings, route: "/profile"},
+
   ];
 
   return (
     <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
       {/* Logo */}
-      <div className="flex items-center gap-2 mb-10 px-2">
-        <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-white font-bold text-sm">
-          🧭
-        </div>
-        <span className="text-xl font-bold text-blue-900">UT Compass</span>
+      <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
+        <Compass className="h-7 w-7"></Compass>
+        <span className="text-xl font-bold">UT Compass</span>
       </div>
 
       {/* Nav */}
@@ -98,7 +98,7 @@ function Sidebar({ user }: { user: User }) {
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-            <span>{item.icon}</span>
+          <item.icon className="h-4 w-4" />
             {item.label}
           </button>
         ))}
@@ -108,7 +108,7 @@ function Sidebar({ user }: { user: User }) {
       <div className="flex flex-col gap-3 px-2 mt-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
-            👤
+            <User className="h-6 w-6"></User>
           </div>
           <div className="overflow-hidden">
             <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
@@ -156,7 +156,8 @@ function SearchAndFilters() {
         </button>
       ))}
       <button className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
-        Exclude Conflicting 👁
+        Exclude Conflicting
+        <Eye className="h-4 w-4"></Eye>
       </button>
     </div>
   );
@@ -199,8 +200,14 @@ function EventCardItem({ card, isSaved, onToggleSave }: { card: EventCard; isSav
         {/* Date & Location */}
         <div className="flex flex-col gap-1 text-xs text-blue-600">
           {/* Replace with illustration */}
-          <span>📅 {card.date}</span>
-          <span>📍 {card.location}</span>
+          <span className="flex items-center gap-1">
+              <Calendar className="h-4 w-4"></Calendar>
+              {card.date}
+          </span>
+          <span className="flex items-center gap-1">
+            <MapPin className="h-4 w-4"></MapPin>
+            {card.location}
+          </span>
         </div>
 
         {/* Description */}
@@ -216,7 +223,9 @@ function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-gray-900 text-base">Upcoming Events</h2>
-          <span className="text-gray-400">📅</span>
+          <span className="text-blue-900">
+            <Calendar className="h-7 w-7"></Calendar>
+          </span>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -224,8 +233,14 @@ function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
             <div key={event.id} className="border border-gray-100 rounded-xl p-3 hover:bg-gray-50 transition cursor-pointer">
               <p className="font-semibold text-sm text-gray-800 mb-2 leading-snug">{event.title}</p>
               <div className="mt-2 flex flex-col gap-0.5 text-xs text-gray-500">
-                <span>📅 {event.time}</span>
-                {event.location && <span>📍 {event.location}</span>}
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4"></Calendar>
+                  {event.time}
+                </span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4"></MapPin>
+                  {event.location}
+                </span>
               </div>
             </div>
           ))}
