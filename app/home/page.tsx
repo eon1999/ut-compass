@@ -13,6 +13,7 @@ interface Tag {
 interface EventCard {
   id: string;
   title: string;
+  organization: string;
   date: string;
   startTime: Date;
   location: string;
@@ -42,12 +43,14 @@ interface FirestoreTimestamp {
 
 interface DBEvent {
   id: string;
-  source: "hornslink" | "manual";
-  scraped_at: string;
+  src: string;
+  source?: "hornslink" | "manual";
+  scraped_at?: string;
+  organization?: { name: string; id: string };
   content: {
     title: string;
     description: string;
-    org_name: string;
+    org_name?: string;
     location: string;
     startTime: string | FirestoreTimestamp;
     endTime?: string | FirestoreTimestamp;
@@ -190,6 +193,9 @@ function EventCardItem({ card, isSaved, onToggleSave }: { card: EventCard; isSav
         {/* Title */}
         <h3 className="font-bold text-gray-900 text-base leading-snug">{card.title}</h3>
 
+        {/* Organization Name */}
+        <h4 className="text-xs text-gray-700 text-base">{card.organization}</h4>
+
         {/* Date & Location */}
         <div className="flex flex-col gap-1 text-xs text-blue-600">
           {/* Replace with illustration */}
@@ -259,6 +265,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
   return {
     id: event.id,
     title: event.content.title,
+    organization: event.organization?.name ?? event.content.org_name ?? "",
     date: formattedDate,
     startTime: date,
     location: event.content.location,
