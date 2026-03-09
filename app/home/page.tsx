@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-
 
 interface Tag {
   label: string;
@@ -62,49 +62,45 @@ interface DBEvent {
 }
 
 function Sidebar({ user }: { user: User }) {
-  const [active, setActive] = useState("dashboard");
+  const router = useRouter();
+  const pathname = usePathname();
 
   const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: "🏠" },
-    { id: "saved", label: "Your Saved", icon: "🔖" },
-    { id: "settings", label: "Settings", icon: "⚙️" },
+    { id: "dashboard", label: "Dashboard", icon: "🏠", route: "/home" },
+    { id: "saved", label: "Your Saved", icon: "🔖", route: "/saved" },
   ];
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col justify-between py-6 px-4">
+    <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
       {/* Logo */}
-      <div>
-        <div className="flex items-center gap-2 mb-10 px-2">
-          {/* Replace with actual logo */}
-          <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-white font-bold text-sm">
-            🧭
-          </div>
-          <span className="text-xl font-bold text-blue-900">UT Compass</span>
+      <div className="flex items-center gap-2 mb-10 px-2">
+        <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-white font-bold text-sm">
+          🧭
         </div>
-
-        {/* Nav */}
-        <nav className="flex flex-col gap-2">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActive(item.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-medium transition-colors ${
-                active === item.id
-                  ? "bg-amber-100 text-amber-800"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
+        <span className="text-xl font-bold text-blue-900">UT Compass</span>
       </div>
 
+      {/* Nav */}
+      <nav className="flex flex-col gap-2">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => router.push(item.route)}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-medium transition-colors ${
+              pathname === item.route
+                ? "bg-amber-100 text-amber-800"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
       {/* User Profile */}
-      <div className="flex flex-col gap-3 px-2">
+      <div className="flex flex-col gap-3 px-2 mt-10">
         <div className="flex items-center gap-3">
-          {/* Replace with actual avatar */}
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
             👤
           </div>
@@ -114,10 +110,12 @@ function Sidebar({ user }: { user: User }) {
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="flex-1 border border-gray-300 rounded-lg py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition">
+          <button className="flex-1 border border-gray-300 rounded-lg py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition"
+                  onClick={() => router.push("/profile")}>
             Edit Profile
           </button>
-          <button className="flex-1 bg-blue-900 text-white rounded-lg py-1.5 text-sm hover:bg-blue-800 transition">
+          <button className="flex-1 bg-blue-900 text-white rounded-lg py-1.5 text-sm hover:bg-blue-800 transition"
+                  onClick={() => router.push("..")}>
             Logout
           </button>
         </div>
@@ -126,10 +124,10 @@ function Sidebar({ user }: { user: User }) {
   );
 }
 
-function HeroHeader({ name }: { name: string }) {
+function Header({ name }: { name: string }) {
   return (
     <div className="w-full h-40 bg-gradient-to-r from-blue-900 to-blue-600 flex items-center px-8 rounded-b-none">
-      {/* TODO: Add wave SVG background illustration */}
+      {/* TODO: Add background illustration */}
       <h1 className="text-4xl font-bold text-white">Ahoy, {name}!</h1>
     </div>
   );
@@ -182,6 +180,7 @@ function EventCardItem({ card }: { card: EventCard }) {
 
         {/* Date & Location */}
         <div className="flex flex-col gap-1 text-xs text-blue-600">
+          {/* Replace with illustration */}
           <span>📅 {card.date}</span>
           <span>📍 {card.location}</span>
         </div>
@@ -308,7 +307,7 @@ export default function Page() {
           </button>
         </header>
 
-        <HeroHeader name={currentUser.name.split(" ")[0]} />
+        <Header name={currentUser.name.split(" ")[0]} />
 
         <SearchAndFilters />
 

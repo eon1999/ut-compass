@@ -64,7 +64,7 @@ export default function AuthenticationPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
-      router.push(isNewUser ? "/onboarding" : "/");
+      router.push(isNewUser ? "/onboarding" : "/home");
     } catch (err) {
       const message = err instanceof Error ? err.message : JSON.stringify(err);
       setError(message);

@@ -104,6 +104,13 @@ export default function ProfilePage() {
             </div>
           </section>
         </div>
+
+        <button
+          onClick={() => router.push("/home")}
+          className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-2 text-white hover:bg-blue-700"
+        >
+          Home
+        </button>
       </div>
     </main>
   );

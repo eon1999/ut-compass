@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Compass } from "lucide-react";
 import { doc, setDoc } from "firebase/firestore";
@@ -393,9 +393,8 @@ export default function OnboardingPage() {
     setCurrentStep((previousStep) => previousStep + 1);
   };
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!canContinue) {
+  const handleSubmit = async () => {
+    if (currentStep !== steps.length - 1 || !canContinue) {
       return;
     }
 
@@ -516,7 +515,7 @@ export default function OnboardingPage() {
           </h1>
           <p className="mt-3 text-gray-600">{steps[currentStep].description}</p>
 
-          <form className="mt-10 space-y-8" onSubmit={handleSubmit}>
+          <form className="mt-10 space-y-8">
             {currentStep === 0 && (
               <div className="space-y-6">
                 <fieldset className="space-y-3">
@@ -718,6 +717,10 @@ export default function OnboardingPage() {
                     <dt className="font-medium text-gray-500">Interests</dt>
                     <dd>{formData.interests.join(", ")}</dd>
                   </div>
+                  <div className="flex flex-col gap-1 border-b border-gray-100 pb-3">
+                    <dt className="font-medium text-gray-500">Interests</dt>
+                    <dd>{formData.hobbies.join(", ")}</dd>
+                  </div>
                 </dl>
               </div>
             )}
@@ -739,7 +742,8 @@ export default function OnboardingPage() {
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmit}
                   className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white transition hover:bg-blue-700"
                 >
                   Finish onboarding
