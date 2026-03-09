@@ -1,321 +1,206 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Mail, Lock, User } from "lucide-react";
 
-// --- Types ---
-type CommitmentLevel = "High Commitment" | "Medium Commitment" | "Low Commitment";
-type Priority = "High Priority" | "Medium Priority" | "Low Priority";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider,
+  getAdditionalUserInfo,
+} from "firebase/auth";
+import { auth } from "../lib/firebase";
 
-interface Tag {
-  label: string;
-}
+export default function AuthenticationPage() {
+  const [isLogin, setIsLogin] = useState(true);
 
-interface EventCard {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
-  description: string;
-  commitment: CommitmentLevel;
-  tags: Tag[];
-  imageUrl?: string;
-}
+  const [email, setEmail] = useState("");
 
-interface UpcomingEvent {
-  id: string;
-  title: string;
-  priority: Priority;
-  time: string;
-  location: string;
-}
+  const [password, setPassword] = useState("");
 
-interface User {
-  name: string;
-  email: string;
-  avatarUrl?: string;
-  totalCaught: number;
-}
+  const [name, setName] = useState("");
 
-// --- Mock Data ---
-const mockUser: User = {
-  name: "Ashwika Katiyar",
-  email: "ashwikakatiyar@gmail.com",
-  totalCaught: 4,
-};
+  const [loading, setLoading] = useState(false);
 
-const mockCards: EventCard[] = [
-  {
-    id: "1",
-    title: "Annual UT Design-A-Thon",
-    date: "January 1",
-    location: "GDC 2.210",
-    description: "Design a product in Figma with teams of 3-5 in 72hrs!",
-    commitment: "High Commitment",
-    tags: [{ label: "Design" }, { label: "UX/UI" }, { label: "+3 More" }],
-  },
-  {
-    id: "2",
-    title: "STEM Career Showcase",
-    date: "March 1",
-    location: "SZB 5.110",
-    description: "Lorem ipsum dolor sit amet consectetur.",
-    commitment: "Low Commitment",
-    tags: [{ label: "STEM" }, { label: "Career-Orientated" }, { label: "+1 More" }],
-  },
-  {
-    id: "3",
-    title: "Longhorn Career Expo",
-    date: "February 4",
-    location: "JES 2.210A",
-    description: "Lorem ipsum dolor sit amet consectetur.",
-    commitment: "Low Commitment",
-    tags: [{ label: "Business" }, { label: "Career-Orientated" }, { label: "+1 More" }],
-  },
-  {
-    id: "4",
-    title: "Business & Tech Talent Fair",
-    date: "January 3",
-    location: "SZB 3.510",
-    description: "Lorem ipsum dolor sit amet consectetur.",
-    commitment: "Medium Commitment",
-    tags: [{ label: "Tech" }, { label: "Business" }, { label: "+3 More" }],
-  },
-  {
-    id: "5",
-    title: "Longhorn Networking Night",
-    date: "January 29",
-    location: "GSB Atrium",
-    description: "Lorem ipsum dolor sit amet consectetur.",
-    commitment: "Low Commitment",
-    tags: [{ label: "Network" }, { label: "Business" }],
-  },
-  {
-    id: "6",
-    title: "LinkedIn & Personal Branding Lab",
-    date: "January 1",
-    location: "GDC 2.210",
-    description: "Lorem ipsum dolor sit amet consectetur.",
-    commitment: "High Commitment",
-    tags: [{ label: "LinkedIn" }, { label: "Branding" }, { label: "+3 More" }],
-  },
-];
+  const [error, setError] = useState("");
 
-const mockUpcoming: UpcomingEvent[] = [
-  { id: "1", title: "Annual UT Design-A-Thon", priority: "High Priority", time: "Today at 2:00 PM", location: "GDC 2.210" },
-  { id: "2", title: "Business & Tech Talent Fair", priority: "High Priority", time: "January 3rd at 5:00 PM", location: "SZB 3.510" },
-  { id: "3", title: "Longhorn Networking Night", priority: "Low Priority", time: "January 29th at 4:30 PM", location: "GSB Atrium" },
-  { id: "4", title: "STEM Career Showcase", priority: "Medium Priority", time: "February 2nd at 11:00 AM", location: "" },
-];
+  const router = useRouter();
 
-// --- Sub-components ---
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-function Sidebar({ user }: { user: User }) {
-  const [active, setActive] = useState("dashboard");
+    setLoading(true);
 
-  const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: "🏠" },
-    { id: "saved", label: "Your Saved", icon: "🔖" },
-    { id: "settings", label: "Settings", icon: "⚙️" },
-  ];
+    setError("");
+
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+        router.push("/home");
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        if (auth.currentUser && name) {
+          await updateProfile(auth.currentUser, { displayName: name });
+        }
+        console.log("Account created:", userCredential.user.uid);
+        router.push("/onboarding");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : JSON.stringify(err);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
+      router.push(isNewUser ? "/onboarding" : "/");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : JSON.stringify(err);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col justify-between py-6 px-4">
-      {/* Logo */}
-      <div>
-        <div className="flex items-center gap-2 mb-10 px-2">
-          {/* Replace with actual logo */}
-          <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-white font-bold text-sm">
-            🧭
-          </div>
-          <span className="text-xl font-bold text-blue-900">UT Compass</span>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
+
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isLogin ? "Welcome Back" : "Create Account"}
+          </h1>
+
+          <p className="text-gray-600">
+            {isLogin ? "Log in to your account" : "Join us today"}
+          </p>
         </div>
 
-        {/* Nav */}
-        <nav className="flex flex-col gap-2">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActive(item.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-medium transition-colors ${
-                active === item.id
-                  ? "bg-amber-100 text-amber-800"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </div>
 
-      {/* User Profile */}
-      <div className="flex flex-col gap-3 px-2">
-        <div className="flex items-center gap-3">
-          {/* Replace with actual avatar */}
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
-            👤
-          </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
-            <p className="text-xs text-gray-400 truncate">{user.email}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button className="flex-1 border border-gray-300 rounded-lg py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition">
-            Edit Profile
-          </button>
-          <button className="flex-1 bg-blue-900 text-white rounded-lg py-1.5 text-sm hover:bg-blue-800 transition">
-            Logout
+        <div className="mb-4 bg-black text-white rounded-lg">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full inline-flex items-center justify-center gap-2 border border-gray-300 py-2 rounded-lg hover:bg-orange-700 disabled:opacity-50"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+              <path fill="#EA4335" d="M23.64 12.205c0-.78-.07-1.53-.2-2.255H12v4.268h6.36c-.275 1.48-1.14 2.73-2.43 3.57v2.975h3.93c2.29-2.11 3.6-5.22 3.6-8.558z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.93-2.91l-3.93-2.975c-1.09.73-2.5 1.16-4 1.16-3.08 0-5.69-2.08-6.62-4.88H1.29v3.06C3.26 21.9 7.31 24 12 24z" />
+              <path fill="#4A90E2" d="M5.38 14.39a7.43 7.43 0 010-4.78V6.55H1.29a12 12 0 000 10.9l4.09-3.06z" />
+              <path fill="#FBBC05" d="M12 4.8c1.75 0 3.33.6 4.57 1.77l3.43-3.43C17.94 1.24 15.24 0 12 0 7.31 0 3.26 2.1 1.29 5.55l4.09 3.06C6.31 6.88 8.92 4.8 12 4.8z" />
+            </svg>
+            Continue with Google
           </button>
         </div>
-      </div>
-    </aside>
-  );
-}
 
-function HeroHeader({ name }: { name: string }) {
-  return (
-    <div className="w-full h-40 bg-gradient-to-r from-blue-900 to-blue-600 flex items-center px-8 rounded-b-none">
-      {/* TODO: Add wave SVG background illustration */}
-      <h1 className="text-4xl font-bold text-white">Ahoy, {name}!</h1>
-    </div>
-  );
-}
+        <form onSubmit={handleSubmit} className="space-y-4">
 
-function SearchAndFilters() {
-  return (
-    <div className="flex gap-3 flex-wrap px-8 py-5">
-      <input
-        type="text"
-        placeholder="Search Clubs, Events, and More..."
-        className="flex-1 min-w-48 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-200"
-      />
-      {["Commitment", "Priority", "Interests"].map((filter) => (
-        <button
-          key={filter}
-          className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
-        >
-          {filter} <span className="text-gray-400">▾</span>
-        </button>
-      ))}
-      <button className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
-        Exclude Conflicting 👁
-      </button>
-    </div>
-  );
-}
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name
+              </label>
 
-const commitmentColors: Record<CommitmentLevel, string> = {
-  "High Commitment": "bg-red-100 text-red-700",
-  "Medium Commitment": "bg-orange-100 text-orange-700",
-  "Low Commitment": "bg-green-100 text-green-700",
-};
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
 
-function EventCardItem({ card }: { card: EventCard }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
-      {/* Image placeholder */}
-      <div className="h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-sm">
-        {/* Replace with <Image> */}
-        [Event Image]
-      </div>
-
-      <div className="p-4 flex flex-col gap-2 flex-1">
-        {/* Tags */}
-        <div className="flex flex-wrap gap-1.5">
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${commitmentColors[card.commitment]}`}>
-            {card.commitment}
-          </span>
-          {card.tags.map((tag) => (
-            <span key={tag.label} className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-              {tag.label}
-            </span>
-          ))}
-        </div>
-
-        {/* Title */}
-        <h3 className="font-bold text-gray-900 text-base leading-snug">{card.title}</h3>
-
-        {/* Date & Location */}
-        <div className="flex flex-col gap-1 text-xs text-blue-600">
-          <span>📅 {card.date}</span>
-          <span>📍 {card.location}</span>
-        </div>
-
-        {/* Description */}
-        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
-      </div>
-    </div>
-  );
-}
-
-const priorityColors: Record<Priority, string> = {
-  "High Priority": "bg-amber-100 text-amber-700",
-  "Medium Priority": "bg-purple-100 text-purple-700",
-  "Low Priority": "bg-green-100 text-green-700",
-};
-
-function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
-  return (
-    <aside className="w-72 shrink-0">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-gray-900 text-base">Upcoming Events</h2>
-          <span className="text-gray-400">📅</span>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {events.map((event) => (
-            <div key={event.id} className="border border-gray-100 rounded-xl p-3 hover:bg-gray-50 transition cursor-pointer">
-              <p className="font-semibold text-sm text-gray-800 mb-2 leading-snug">{event.title}</p>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${priorityColors[event.priority]}`}>
-                {event.priority}
-              </span>
-              <div className="mt-2 flex flex-col gap-0.5 text-xs text-gray-500">
-                <span>📅 {event.time}</span>
-                {event.location && <span>📍 {event.location}</span>}
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-700"
+                  placeholder="Your name"
+                  required
+                />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-    </aside>
-  );
-}
+          )}
 
-// --- Page ---
-export default function Page() {
-  return (
-    <div className="flex min-h-screen bg-gray-50 font-sans">
-      <Sidebar user={mockUser} />
 
-      <div className="flex flex-col flex-1 min-w-0">
-        {/* Top bar */}
-        <header className="flex justify-end items-center gap-3 px-8 py-3 bg-white border-b border-gray-100">
-          <div className="flex items-center gap-2 border border-gray-200 rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700">
-            🐟 {mockUser.totalCaught} Total Caught
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-700"
+                placeholder="your@email.com"
+                required
+              />
+            </div>
           </div>
-          <button className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition">
-            🇺🇸 English ▾
+
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-700"
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+          </div>
+
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-black text-white font-semibold py-2 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Loading..." : isLogin ? "Sign In" : "Create Account"}
           </button>
-        </header>
+        </form>
 
-        <HeroHeader name={mockUser.name.split(" ")[0]} />
 
-        <SearchAndFilters />
+        <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+          <p className="text-gray-600 text-sm">
+            {isLogin ? "Don't have an account?" : "Already have an account?"}
 
-        {/* Main content + sidebar */}
-        <div className="flex gap-6 px-8 pb-8 flex-1">
-          {/* Cards grid */}
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 content-start">
-            {mockCards.map((card) => (
-              <EventCardItem key={card.id} card={card} />
-            ))}
-          </div>
+            <button
+              onClick={() => {
+                setIsLogin(!isLogin);
 
-          {/* Upcoming events */}
-          <UpcomingEventsPanel events={mockUpcoming} />
+                setError("");
+              }}
+              className="text-orange-700 font-semibold hover:underline ml-1"
+            >
+              {isLogin ? "Sign up" : "Log in"}
+            </button>
+          </p>
         </div>
       </div>
     </div>

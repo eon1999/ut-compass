@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Compass } from "lucide-react";
-import { db } from "@/lib/db/firebaseAdmin";
+import { doc, setDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
 
 
 type OnboardingFormData = {
@@ -398,15 +399,18 @@ export default function OnboardingPage() {
       return;
     }
 
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setSubmitted(false);
+      return;
+    }
+
     const payload = {
       ...formData,
       submittedAt: new Date().toISOString(),
     };
 
-    await db
-      .collection("onboardingSubmissions")
-      .doc(payload.email)
-      .set(payload);
+    await setDoc(doc(db, "users", uid), payload);
 
     window.localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
