@@ -33,7 +33,6 @@ interface User {
   name: string;
   email: string;
   avatarUrl?: string;
-  totalCaught: number;
 }
 
 interface FirestoreTimestamp {
@@ -350,7 +349,6 @@ export default function Page() {
     name: user?.displayName ?? user?.email ?? "Student",
     email: user?.email ?? "",
     avatarUrl: user?.photoURL ?? undefined,
-    totalCaught: 0,
   };
 
   const now = new Date();
@@ -374,7 +372,7 @@ export default function Page() {
         {/* Top bar */}
         <header className="flex justify-end items-center gap-3 px-8 py-3 bg-white border-b border-gray-100">
           <div className="flex items-center gap-2 border border-gray-200 rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700">
-            🐟 {currentUser.totalCaught} Total Caught
+            🐟 {savedIds.size} Total Caught
           </div>
           <button className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition">
             🇺🇸 English ▾
