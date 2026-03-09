@@ -73,6 +73,7 @@ function Sidebar({ user }: { user: User }) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "🏠", route: "/home" },
     { id: "saved", label: "Your Saved", icon: "🔖", route: "/saved" },
+    { id: "settings", label: "Settings", icon: "⚙️", route: "/profile"},
   ];
 
   return (
