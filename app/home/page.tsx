@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
+import { doc, getDoc, arrayUnion, arrayRemove, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface Tag {
   label: string;
@@ -12,6 +14,7 @@ interface EventCard {
   id: string;
   title: string;
   date: string;
+  startTime: Date;
   location: string;
   description: string;
   tags: Tag[];
@@ -156,7 +159,7 @@ function SearchAndFilters() {
   );
 }
 
-function EventCardItem({ card }: { card: EventCard }) {
+function EventCardItem({ card, isSaved, onToggleSave }: { card: EventCard; isSaved: boolean; onToggleSave: (id: string) => void }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
       {/* Image placeholder */}
@@ -166,13 +169,22 @@ function EventCardItem({ card }: { card: EventCard }) {
       </div>
 
       <div className="p-4 flex flex-col gap-2 flex-1">
-        {/* Tags */}
-        <div className="flex flex-wrap gap-1.5">
-          {card.tags.map((tag) => (
-            <span key={tag.label} className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-              {tag.label}
-            </span>
-          ))}
+        {/* Tags + bookmark */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {card.tags.map((tag) => (
+              <span key={tag.label} className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                {tag.label}
+              </span>
+            ))}
+          </div>
+          <button
+            onClick={() => onToggleSave(card.id)}
+            className="shrink-0 text-lg leading-none"
+            aria-label={isSaved ? "Unsave event" : "Save event"}
+          >
+            {isSaved ? "🎣" : "🐟"}
+          </button>
         </div>
 
         {/* Title */}
@@ -248,6 +260,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     id: event.id,
     title: event.content.title,
     date: formattedDate,
+    startTime: date,
     location: event.content.location,
     description: event.content.description,
     tags: [
@@ -255,6 +268,46 @@ function mapDBEventToCard(event: DBEvent): EventCard {
       ...topTags,
     ],
   };
+}
+
+function useSavedEvents(userId: string | undefined) {
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!userId) return;
+    const userRef = doc(db, "users", userId);
+    getDoc(userRef).then((snap) => {
+      const data = snap.data();
+      if (data?.savedEventIds) {
+        setSavedIds(new Set(data.savedEventIds));
+      }
+    });
+  }, [userId]);
+
+  async function toggleSave(eventId: string) {
+    if (!userId) return;
+    const userRef = doc(db, "users", userId);
+    const isSaved = savedIds.has(eventId);
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) next.delete(eventId);
+      else next.add(eventId);
+      return next;
+    });
+    try {
+      await setDoc(userRef, { savedEventIds: isSaved ? arrayRemove(eventId) : arrayUnion(eventId) }, { merge: true });
+    } catch {
+      // revert on error
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (isSaved) next.add(eventId);
+        else next.delete(eventId);
+        return next;
+      });
+    }
+  }
+
+  return { savedIds, toggleSave };
 }
 
 function useEvents() {
@@ -284,6 +337,7 @@ function useEvents() {
 export default function Page() {
   const { cards, loading, error } = useEvents();
   const { user } = useAuth();
+  const { savedIds, toggleSave } = useSavedEvents(user?.uid);
 
   const currentUser: User = {
     name: user?.displayName ?? user?.email ?? "Student",
@@ -291,6 +345,19 @@ export default function Page() {
     avatarUrl: user?.photoURL ?? undefined,
     totalCaught: 0,
   };
+
+  const now = new Date();
+  const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const upcomingEvents: UpcomingEvent[] = cards
+    .filter((c) => savedIds.has(c.id) && c.startTime >= now && c.startTime <= sevenDaysLater)
+    .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      time: c.date,
+      location: c.location,
+    }));
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
@@ -318,12 +385,12 @@ export default function Page() {
             {loading && <p className="text-gray-400 col-span-3 text-center py-10">Loading events...</p>}
             {error && <p className="text-red-500 col-span-3 text-center py-10">{error}</p>}
             {!loading && !error && cards.map((card) => (
-              <EventCardItem key={card.id} card={card} />
+              <EventCardItem key={card.id} card={card} isSaved={savedIds.has(card.id)} onToggleSave={toggleSave} />
             ))}
           </div>
 
           {/* Upcoming events */}
-          <UpcomingEventsPanel events={[]} />
+          <UpcomingEventsPanel events={upcomingEvents} />
         </div>
       </div>
     </div>
