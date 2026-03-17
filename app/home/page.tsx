@@ -17,6 +17,7 @@ interface EventCard {
   organization: string;
   date: string;
   startTime: Date;
+  endTime?: Date;
   location: string;
   description: string;
   tags: Tag[];
@@ -139,11 +140,13 @@ function Header({ name }: { name: string }) {
   );
 }
 
-function SearchAndFilters() {
+function SearchAndFilters({ excludeConflicting, onToggleExclude, searchQuery, onSearchChange }: { excludeConflicting: boolean; onToggleExclude: () => void; searchQuery: string; onSearchChange: (q: string) => void }) {
   return (
     <div className="flex gap-3 flex-wrap px-8 py-5">
       <input
         type="text"
+        value={searchQuery}
+        onChange={(e) => onSearchChange(e.target.value)}
         placeholder="Search Clubs, Events, and More..."
         className="flex-1 min-w-48 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-200"
       />
@@ -155,7 +158,14 @@ function SearchAndFilters() {
           {filter} <span className="text-gray-400">▾</span>
         </button>
       ))}
-      <button className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+      <button
+        onClick={onToggleExclude}
+        className={`flex items-center gap-1 border rounded-full px-4 py-2 text-sm transition ${
+          excludeConflicting
+            ? "border-blue-500 bg-blue-50 text-blue-700"
+            : "border-gray-200 text-gray-700 hover:bg-gray-50"
+        }`}
+      >
         Exclude Conflicting
         <Eye className="h-4 w-4"></Eye>
       </button>
@@ -163,9 +173,9 @@ function SearchAndFilters() {
   );
 }
 
-function EventCardItem({ card, isSaved, onToggleSave }: { card: EventCard; isSaved: boolean; onToggleSave: (id: string) => void }) {
+function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: EventCard; isSaved: boolean; onToggleSave: (id: string) => void; isConflicting?: boolean }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isConflicting ? "opacity-40 grayscale" : ""}`}>
       {/* Image placeholder */}
       <div className="h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-sm">
         {/* Replace with <Image> */}
@@ -277,12 +287,17 @@ function mapDBEventToCard(event: DBEvent): EventCard {
 
   const primaryCategory = event.tags?.primary_category ?? "Uncategorized";
 
+  const endTime = event.content.endTime
+    ? parseStartTime(event.content.endTime)
+    : undefined;
+
   return {
     id: event.id,
     title: event.content.title,
     organization: event.organization?.name ?? event.content.org_name ?? "",
     date: formattedDate,
     startTime: date,
+    endTime,
     location: event.content.location,
     description: event.content.description,
     tags: [
@@ -360,6 +375,8 @@ export default function Page() {
   const { cards, loading, error } = useEvents();
   const { user } = useAuth();
   const { savedIds, toggleSave } = useSavedEvents(user?.uid);
+  const [excludeConflicting, setExcludeConflicting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const currentUser: User = {
     name: user?.displayName ?? user?.email ?? "Student",
@@ -380,6 +397,30 @@ export default function Page() {
       location: c.location,
     }));
 
+  const query = searchQuery.toLowerCase().trim();
+  const filteredCards = query
+    ? cards.filter((c) =>
+        c.title.toLowerCase().includes(query) ||
+        c.organization.toLowerCase().includes(query) ||
+        c.location.toLowerCase().includes(query) ||
+        c.tags.some((t) => t.label.toLowerCase().includes(query))
+      )
+    : cards;
+
+  const savedCards = cards.filter((c) => savedIds.has(c.id));
+  const conflictingIds = new Set(
+    cards
+      .filter((card) => !savedIds.has(card.id))
+      .filter((card) =>
+        savedCards.some((saved) => {
+          const cardEnd = card.endTime ?? new Date(card.startTime.getTime() + 60 * 60 * 1000);
+          const savedEnd = saved.endTime ?? new Date(saved.startTime.getTime() + 60 * 60 * 1000);
+          return card.startTime < savedEnd && cardEnd > saved.startTime;
+        })
+      )
+      .map((c) => c.id)
+  );
+
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <Sidebar user={currentUser} />
@@ -390,14 +431,11 @@ export default function Page() {
           <div className="flex items-center gap-2 border border-gray-200 rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700">
             🐟 {savedIds.size} Total Caught
           </div>
-          <button className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition">
-            🇺🇸 English ▾
-          </button>
         </header>
 
         <Header name={currentUser.name.split(" ")[0]} />
 
-        <SearchAndFilters />
+        <SearchAndFilters excludeConflicting={excludeConflicting} onToggleExclude={() => setExcludeConflicting((v) => !v)} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
         {/* Main content + sidebar */}
         <div className="flex gap-6 px-8 pb-8 flex-1">
@@ -405,8 +443,14 @@ export default function Page() {
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 content-start">
             {loading && <p className="text-gray-400 col-span-3 text-center py-10">Loading events...</p>}
             {error && <p className="text-red-500 col-span-3 text-center py-10">{error}</p>}
-            {!loading && !error && cards.map((card) => (
-              <EventCardItem key={card.id} card={card} isSaved={savedIds.has(card.id)} onToggleSave={toggleSave} />
+            {!loading && !error && filteredCards.map((card) => (
+              <EventCardItem
+                key={card.id}
+                card={card}
+                isSaved={savedIds.has(card.id)}
+                onToggleSave={toggleSave}
+                isConflicting={excludeConflicting && conflictingIds.has(card.id)}
+              />
             ))}
           </div>
 
