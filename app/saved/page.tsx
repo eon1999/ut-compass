@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { doc, getDoc, setDoc, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, setDoc, arrayRemove, updateDoc, deleteField } from "firebase/firestore";
 import { Compass, Calendar, MapPin, House, Fish, Settings } from "lucide-react";
+import Image from "next/image"
 import { db } from "@/lib/firebase";
+import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
 
 interface Tag {
   label: string;
@@ -15,6 +17,8 @@ interface EventCard {
   id: string;
   title: string;
   date: string;
+  startTime: Date;
+  endTime?: Date;
   location: string;
   description: string;
   tags: Tag[];
@@ -81,10 +85,16 @@ function mapDBEventToCard(event: DBEvent): EventCard {
 
   const primaryCategory = event.tags?.primary_category ?? "Uncategorized";
 
+  const endTime = event.content.endTime
+    ? parseStartTime(event.content.endTime)
+    : undefined;
+
   return {
     id: event.id,
     title: event.content.title,
     date: formattedDate,
+    startTime: date,
+    endTime,
     location: event.content.location,
     description: event.content.description,
     tags: [{ label: primaryCategory }, ...topTags],
@@ -104,7 +114,9 @@ function Sidebar({ user }: { user: User }) {
   return (
     <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
       <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
-        <Compass className="h-7 w-7"></Compass>
+        <div className="relative h-10 w-10 overflow-hidden">
+          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-125 origin-center" />
+        </div>
         <span className="text-xl font-bold">UT Compass</span>
       </div>
 
@@ -157,10 +169,28 @@ function Sidebar({ user }: { user: User }) {
 function SavedEventCard({
   card,
   onUnsave,
+  onAddToGCal,
 }: {
   card: EventCard;
   onUnsave: (id: string) => void;
+  onAddToGCal: (card: EventCard) => Promise<{ success: boolean; error?: string }>;
 }) {
+  const [gcalStatus, setGcalStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  async function handleGCal() {
+    setGcalStatus("loading");
+    const result = await onAddToGCal(card);
+    if (!result.success && result.error !== "cancelled") {
+      setGcalStatus("error");
+      setTimeout(() => setGcalStatus("idle"), 2500);
+    } else if (result.success) {
+      setGcalStatus("success");
+      setTimeout(() => setGcalStatus("idle"), 2500);
+    } else {
+      setGcalStatus("idle");
+    }
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
       <div className="h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-sm">
@@ -202,6 +232,82 @@ function SavedEventCard({
         </div>
 
         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+
+        <button
+          onClick={handleGCal}
+          disabled={gcalStatus === "loading" || gcalStatus === "success"}
+          className="mt-2 w-full border border-gray-200 rounded-xl py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition disabled:opacity-60"
+        >
+          {gcalStatus === "loading" && "Adding to Google Calendar..."}
+          {gcalStatus === "success" && "Added to Google Calendar!"}
+          {gcalStatus === "error" && "Failed — try again"}
+          {gcalStatus === "idle" && "Add to Google Calendar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GCalUnsaveModal({
+  card,
+  onUnsaveOnly,
+  onUnsaveAndDelete,
+  onDismiss,
+}: {
+  card: EventCard;
+  onUnsaveOnly: () => Promise<void>;
+  onUnsaveAndDelete: () => Promise<void>;
+  onDismiss: () => void;
+}) {
+  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+
+  async function handle(action: () => Promise<void>) {
+    setState("loading");
+    try {
+      await action();
+      onDismiss();
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 2500);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      onClick={onDismiss}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-bold text-gray-900 text-lg mb-1">
+          Remove from Google Calendar?
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          You added{" "}
+          <span className="font-medium text-gray-700">{card.title}</span>{" "}
+          to Google Calendar. Would you like to remove it too?
+        </p>
+        {state === "error" && (
+          <p className="text-xs text-red-500 mb-3">Something went wrong. Please try again.</p>
+        )}
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => handle(onUnsaveAndDelete)}
+            disabled={state === "loading"}
+            className="w-full bg-blue-900 text-white rounded-xl py-2 text-sm hover:bg-blue-800 transition disabled:opacity-70"
+          >
+            {state === "loading" ? "Removing..." : "Yes, remove from calendar"}
+          </button>
+          <button
+            onClick={() => handle(onUnsaveOnly)}
+            disabled={state === "loading"}
+            className="w-full border border-gray-200 rounded-xl py-2 text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            Just unsave
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -210,23 +316,24 @@ function SavedEventCard({
 export default function Page() {
   const { user } = useAuth();
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [gcalEventIds, setGcalEventIds] = useState<Record<string, string>>({});
   const [allEvents, setAllEvents] = useState<EventCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unsavePending, setUnsavePending] = useState<EventCard | null>(null);
 
   const currentUser: User = {
     name: user?.displayName ?? user?.email ?? "Student",
     email: user?.email ?? "",
   };
 
-  // Load saved IDs from Firestore
+  // Load saved IDs and GCal event IDs from Firestore
   useEffect(() => {
     if (!user?.uid) return;
     const userRef = doc(db, "users", user.uid);
     getDoc(userRef).then((snap) => {
       const data = snap.data();
-      if (data?.savedEventIds) {
-        setSavedIds(new Set(data.savedEventIds));
-      }
+      if (data?.savedEventIds) setSavedIds(new Set(data.savedEventIds));
+      if (data?.gcalEventIds) setGcalEventIds(data.gcalEventIds ?? {});
     });
   }, [user?.uid]);
 
@@ -240,6 +347,26 @@ export default function Page() {
       .finally(() => setLoading(false));
   }, []);
 
+  async function handleAddToGCal(card: EventCard) {
+    const result = await addToGoogleCalendar({
+      title: card.title,
+      location: card.location,
+      description: card.description,
+      startTime: card.startTime,
+      endTime: card.endTime,
+    });
+    if (result.success && result.gcalEventId && user?.uid) {
+      setGcalEventIds((prev) => ({ ...prev, [card.id]: result.gcalEventId! }));
+      const userRef = doc(db, "users", user.uid);
+      try {
+        await updateDoc(userRef, { [`gcalEventIds.${card.id}`]: result.gcalEventId });
+      } catch {
+        await setDoc(userRef, { gcalEventIds: { [card.id]: result.gcalEventId } }, { merge: true });
+      }
+    }
+    return result;
+  }
+
   async function handleUnsave(eventId: string) {
     if (!user?.uid) return;
     setSavedIds((prev) => {
@@ -249,6 +376,33 @@ export default function Page() {
     });
     const userRef = doc(db, "users", user.uid);
     await setDoc(userRef, { savedEventIds: arrayRemove(eventId) }, { merge: true });
+  }
+
+  async function handleUnsaveWithGCal(eventId: string, deleteFromGCal: boolean) {
+    if (!user?.uid) return;
+    if (deleteFromGCal) {
+      const gcalEventId = gcalEventIds[eventId];
+      if (gcalEventId) {
+        const result = await deleteFromGoogleCalendar(gcalEventId);
+        if (!result.success && result.error !== "cancelled") throw new Error(result.error);
+      }
+      setGcalEventIds((prev) => {
+        const next = { ...prev };
+        delete next[eventId];
+        return next;
+      });
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, { [`gcalEventIds.${eventId}`]: deleteField() });
+    }
+    await handleUnsave(eventId);
+  }
+
+  function handleUnsaveClick(eventId: string) {
+    if (gcalEventIds[eventId]) {
+      const card = savedEvents.find((e) => e.id === eventId);
+      if (card) { setUnsavePending(card); return; }
+    }
+    handleUnsave(eventId);
   }
 
   const savedEvents = allEvents.filter((e) => savedIds.has(e.id));
@@ -278,12 +432,21 @@ export default function Page() {
           {!loading && savedEvents.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {savedEvents.map((card) => (
-                <SavedEventCard key={card.id} card={card} onUnsave={handleUnsave} />
+                <SavedEventCard key={card.id} card={card} onUnsave={handleUnsaveClick} onAddToGCal={handleAddToGCal} />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {unsavePending && (
+        <GCalUnsaveModal
+          card={unsavePending}
+          onUnsaveOnly={async () => { await handleUnsave(unsavePending.id); }}
+          onUnsaveAndDelete={async () => { await handleUnsaveWithGCal(unsavePending.id, true); }}
+          onDismiss={() => setUnsavePending(null)}
+        />
+      )}
     </div>
   );
 }
