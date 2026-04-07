@@ -70,7 +70,7 @@ export async function scrapeHornsLinkEvents() {
   }
 
   // parse the response as JSON
-  const data = await res.json();
+  const data = await res.json() as { value?: RawEvent[] };
   console.log("HornsLink status:", res.status);
   console.log("HornsLink raw response:", JSON.stringify(data).slice(0, 500));
   const events = data.value || [];
@@ -128,7 +128,7 @@ export async function scrapeHornsLinkOrganizations() {
     throw new Error(`Failed to fetch organizations from HornsLink: ${response.statusText}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { value?: RawOrganization[] };
   const organizations = data.value || [];
 
   return organizations.map((org: RawOrganization) => {
