@@ -91,7 +91,7 @@ const EventWeightSchema = z.object({
 });
 
 // typescript my beloved
-interface IncomingEvent {
+export interface IncomingEvent {
   id: string;
   content: {
     title: string;

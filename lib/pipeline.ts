@@ -11,7 +11,7 @@ import {
   scrapeHornsLinkEvents,
   scrapeHornsLinkOrganizations,
 } from "@/lib/scrapers/hornslink";
-import { enrichEventData } from "@/lib/ml/enrichClient";
+import { enrichEventData, IncomingEvent } from "@/lib/ml/enrichClient";
 import {
   pushEventToFirestore,
   pushOrganizationToFireStore,
@@ -55,7 +55,9 @@ export async function handleEventIngest(overwrite = false) {
           }
         }
         // enrich the event data by calling our ml service
-        const enrichedEvent = await enrichEventData(rawEvent);
+        const incomingEvent: IncomingEvent =
+          rawEvent as unknown as IncomingEvent;
+        const enrichedEvent = await enrichEventData(incomingEvent);
         await pushEventToFirestore(enrichedEvent);
         successCount++;
       } catch (error) {
@@ -97,7 +99,10 @@ export async function handleOrganizationIngest() {
         );
         continue;
       }
-      await pushOrganizationToFireStore(rawOrg);
+      await pushOrganizationToFireStore({
+        ...rawOrg,
+        profilePicture: rawOrg.profilePicture ?? "",
+      });
     }
   } catch (error) {
     console.error("Error in organization ingestion pipeline:", error);
