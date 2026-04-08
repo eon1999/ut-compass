@@ -21,6 +21,7 @@ interface EventCard {
   endTime?: Date;
   location: string;
   description: string;
+  descriptionHtml?: string;
   tags: Tag[];
 }
 
@@ -35,7 +36,8 @@ interface DBEvent {
   scraped_at: string;
   content: {
     title: string;
-    description: string;
+    descriptionText: string;
+    descriptionHtml?: string;
     org_name: string;
     location: string;
     startTime: string | FirestoreTimestamp;
@@ -96,7 +98,8 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     startTime: date,
     endTime,
     location: event.content.location,
-    description: event.content.description,
+    description: event.content.descriptionText,
+    descriptionHtml: event.content.descriptionHtml,
     tags: [{ label: primaryCategory }, ...topTags],
   };
 }
@@ -115,7 +118,7 @@ function Sidebar({ user }: { user: User }) {
     <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
       <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
         <div className="relative h-10 w-10 overflow-hidden">
-          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-125 origin-center" />
+          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
         </div>
         <span className="text-xl font-bold">UT Compass</span>
       </div>
@@ -231,7 +234,14 @@ function SavedEventCard({
           </span>
         </div>
 
-        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+        {card.descriptionHtml ? (
+          <div
+            className="text-xs text-gray-500 mt-1 line-clamp-2 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden"
+            dangerouslySetInnerHTML={{ __html: card.descriptionHtml }}
+          />
+        ) : (
+          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+        )}
 
         <button
           onClick={handleGCal}

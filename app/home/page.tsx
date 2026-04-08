@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, arrayUnion, arrayRemove, setDoc, updateDoc, deleteField } from "firebase/firestore";
-import { Compass, Calendar, MapPin, House, Fish, Settings, Eye, User } from "lucide-react";
+import { Calendar, MapPin, House, Fish, Settings, Eye, User } from "lucide-react";
 import Image from "next/image"
 import { db } from "@/lib/firebase";
 import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
@@ -22,6 +22,7 @@ interface EventCard {
   endTime?: Date;
   location: string;
   description: string;
+  descriptionHtml?: string;
   tags: Tag[];
   imageUrl?: string;
 }
@@ -52,7 +53,8 @@ interface DBEvent {
   organization?: { name: string; id: string };
   content: {
     title: string;
-    description: string;
+    descriptionText: string;
+    descriptionHtml?: string;
     org_name?: string;
     location: string;
     startTime: string | FirestoreTimestamp;
@@ -86,7 +88,7 @@ function Sidebar({ user }: { user: User }) {
       {/* Logo */}
       <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
         <div className="relative h-10 w-10 overflow-hidden">
-          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-125 origin-center" />
+          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
         </div>
         <span className="text-xl font-bold">UT Compass</span>
       </div>
@@ -233,7 +235,14 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
         </div>
 
         {/* Description */}
-        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+        {card.descriptionHtml ? (
+          <div
+            className="text-xs text-gray-500 mt-1 line-clamp-2 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden"
+            dangerouslySetInnerHTML={{ __html: card.descriptionHtml }}
+          />
+        ) : (
+          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+        )}
       </div>
     </div>
   );
@@ -311,7 +320,8 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     startTime: date,
     endTime,
     location: event.content.location,
-    description: event.content.description,
+    description: event.content.descriptionText,
+    descriptionHtml: event.content.descriptionHtml,
     tags: [
       { label: primaryCategory },
       ...topTags,
