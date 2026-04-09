@@ -44,7 +44,7 @@ function Sidebar({ user }: { user: SidebarUser }) {
         <div className="relative h-10 w-10 overflow-hidden">
           <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
         </div>
-        <span className="text-xl font-bold">UT Compass</span>
+        <span className="text-xl font-more-sugar font-bold">UT Compass</span>
       </div>
 
       <nav className="flex flex-col gap-2">

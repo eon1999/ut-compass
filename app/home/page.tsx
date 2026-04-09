@@ -90,7 +90,7 @@ function Sidebar({ user }: { user: User }) {
         <div className="relative h-10 w-10 overflow-hidden">
           <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
         </div>
-        <span className="text-xl font-bold">UT Compass</span>
+        <span className="text-xl font-more-sugar font-bold">UT Compass</span>
       </div>
 
       {/* Nav */}
@@ -149,7 +149,7 @@ function Header({ name, savedCount }: { name: string, savedCount: number }) {
         </div>
       </div>
 
-      <h1 className="relative z-10 text-4xl font-bold text-white">Ahoy, {name}!</h1>
+      <h1 className="relative z-10 text-4xl font-more-sugar font-bold text-white">Ahoy, {name}!</h1>
     </div>
   );
 }

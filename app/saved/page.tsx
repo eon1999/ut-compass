@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, setDoc, arrayRemove, updateDoc, deleteField } from "firebase/firestore";
-import { Compass, Calendar, MapPin, House, Fish, Settings } from "lucide-react";
+import { Calendar, MapPin, House, Fish, Settings, User } from "lucide-react";
 import Image from "next/image"
 import { db } from "@/lib/firebase";
 import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
@@ -120,7 +120,7 @@ function Sidebar({ user }: { user: User }) {
         <div className="relative h-10 w-10 overflow-hidden">
           <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
         </div>
-        <span className="text-xl font-bold">UT Compass</span>
+        <span className="text-xl font-more-sugar font-bold">UT Compass</span>
       </div>
 
       <nav className="flex flex-col gap-2">
@@ -143,7 +143,7 @@ function Sidebar({ user }: { user: User }) {
       <div className="flex flex-col gap-3 px-2 mt-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
-            👤
+            <User className="h-6 w-6"></User>
           </div>
           <div className="overflow-hidden">
             <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
