@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -97,19 +97,38 @@ function Sidebar({ user }: { user: SidebarUser }) {
   );
 }
 
-const YEAR_OPTIONS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"];
-const MAJOR_OPTIONS = [
-  "Computer Science",
-  "Electrical Engineering",
-  "Mechanical Engineering",
-  "Business Administration",
-  "Psychology",
-  "Biology",
-  "Economics",
-  "Mathematics",
-  "Communication",
-  "Architecture",
+const YEAR_OPTIONS = ["Freshman", "Sophomore", "Junior", "Senior"];
+
+const INTEREST_OPTIONS = [
+  "Mechanical Engineering", "Software Development", "UX/UI Design", "Politics",
+  "Business Administration", "Architecture", "Informatics", "Nursing",
+  "Education", "Liberal Arts", "Fine Arts", "Communications", "Mathematics", "Product Management",
 ];
+
+const GOAL_OPTIONS = [
+  "Gaining technical skills", "Seeking internships", "Research opportunities",
+  "Leadership positions", "Pre-law", "Pre-health", "Certifications",
+  "On-site training", "Build a startup", "Connect with peers", "Interview practice", "Industry experience",
+];
+
+const HOBBY_OPTIONS = [
+  "Playing music", "Drawing/painting", "Reading", "Socializing",
+  "Crocheting", "Cafe-hopping", "Hiking", "Running",
+];
+
+const schoolOptions: Record<string, string[]> = {
+  "School of Architecture": ["Architectural Studies", "Architecture", "Architecture/Architectural Engineering", "Interior Design"],
+  "McCombs School of Business": ["Accounting", "Business Analytics", "Canfield Business Honors Program", "Finance", "International Business", "Management", "Management Information Systems", "Marketing", "Supply Chain Management"],
+  "School of Civic Leadership": ["Civics Honors", "Great Books Honors", "Strategy and Statecraft"],
+  "Moody College of Communication": ["Advertising", "Communication and Leadership", "Communication Studies", "Journalism", "Public Relations", "Radio-Television-Film", "Speech, Language, and Hearing Sciences", "Undeclared (Communication)"],
+  "College of Education": ["Education", "Kinesiology and Health", "Athletic Training"],
+  "Cockrell School of Engineering": ["Aerospace Engineering", "Architectural Engineering", "Biomedical Engineering", "Chemical Engineering", "Civil Engineering", "Computational Engineering", "Electrical and Computer Engineering", "Environmental Engineering", "Geosystems Engineering", "Mechanical Engineering", "Petroleum Engineering"],
+  "College of Fine Arts": ["Acting", "Art Education", "Art History", "Arts and Entertainment Technologies", "Dance", "Dance Education", "Design", "Jazz", "Music", "Music Composition", "Music Performance", "Music Studies", "Studio Art", "Theatre & Dance, Dance", "Theatre & Dance, Theatre", "Theatre Education"],
+  "Jackson School of Geosciences": ["Climate System Science", "Environmental Science", "General Geology", "Geophysics", "Geosciences", "Geosciences (Teaching)", "Geosystems Engineering", "Hydrology and Water Resources"],
+  "School of Information": ["Informatics"],
+  "College of Liberal Arts": ["African and African Diaspora Studies", "American Studies", "Anthropology", "Asian American Studies", "Asian Cultures and Languages", "Asian Studies", "Behavioral and Social Data Science", "Classical Languages", "Classical Studies", "Economics", "English", "Environmental Science", "European Studies", "French Studies", "Geography", "German", "Government", "Health & Society", "History", "Human Dimensions of Organizations", "Humanities", "International Relations and Global Studies", "Italian", "Jewish Studies", "Latin American Studies", "Linguistics", "Mexican American and Latina/o Studies", "Middle Eastern Studies", "Philosophy", "Plan II Honors Program", "Psychology", "Race, Indigeneity, and Migration", "Religious Studies", "Rhetoric and Writing", "Russian, East European and Eurasian Studies", "Sociology", "Spanish", "Sustainability Studies", "Undeclared (Liberal Arts)", "Urban Studies", "Women's and Gender Studies"],
+  "College of Natural Sciences": ["Astronomy", "Biochemistry", "Biology", "Chemistry", "Computer Science", "Environmental Science", "Human Development and Family Sciences", "Human Ecology", "Mathematics", "Medical Laboratory Science", "Neuroscience", "Nutrition", "Physics", "Pre-Pharmacy", "Public Health", "Statistics and Data Science", "Textiles and Apparel", "Undeclared (Natural Sciences)"],
+};
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
@@ -126,8 +145,14 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [yearClassification, setYearClassification] = useState("");
+  const [school, setSchool] = useState("");
   const [major, setMajor] = useState("");
+  const [interests, setInterests] = useState<string[]>([]);
+  const [goals, setGoals] = useState<string[]>([]);
+  const [hobbies, setHobbies] = useState<string[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+
+  const availableMajors = useMemo(() => schoolOptions[school] ?? [], [school]);
 
   useEffect(() => {
     if (loading) return;
@@ -143,7 +168,11 @@ export default function ProfilePage() {
         setFirstName(data.firstName);
         setLastName(data.lastName);
         setYearClassification(data.yearClassification);
+        setSchool(data.school);
         setMajor(data.major);
+        setInterests(data.interests ?? []);
+        setGoals(data.goals ?? []);
+        setHobbies(data.hobbies ?? []);
         setAvatarUrl(data.avatarUrl);
       }
       setFetching(false);
@@ -176,9 +205,13 @@ export default function ProfilePage() {
       firstName,
       lastName,
       yearClassification,
+      school,
       major,
+      interests,
+      goals,
+      hobbies,
     });
-    setProfile((prev) => prev ? { ...prev, firstName, lastName, yearClassification, major } : prev);
+    setProfile((prev) => prev ? { ...prev, firstName, lastName, yearClassification, school, major, interests, goals, hobbies } : prev);
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -292,12 +325,16 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">School</label>
-                  <input
-                    type="text"
-                    value={profile.school}
-                    disabled
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-400 bg-gray-50 cursor-not-allowed"
-                  />
+                  <select
+                    value={school}
+                    onChange={(e) => { setSchool(e.target.value); setMajor(""); }}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                  >
+                    <option value="">Select school</option>
+                    {Object.keys(schoolOptions).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Student Year</label>
@@ -316,12 +353,14 @@ export default function ProfilePage() {
                   <select
                     value={major}
                     onChange={(e) => setMajor(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                    disabled={!school}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 bg-white disabled:bg-gray-50 disabled:text-gray-400"
                   >
-                    {MAJOR_OPTIONS.map((m) => (
+                    <option value="">Select major</option>
+                    {availableMajors.map((m) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
-                    {!MAJOR_OPTIONS.includes(major) && (
+                    {major && !availableMajors.includes(major) && (
                       <option value={major}>{major}</option>
                     )}
                   </select>
@@ -336,35 +375,71 @@ export default function ProfilePage() {
           <h2 className="text-xl font-bold text-gray-900 mb-4">Preferences</h2>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-6">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Academic Interests</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Academic Interests</h3>
               <div className="flex flex-wrap gap-2">
-                {profile.interests.map((item) => (
-                  <span key={item} className="bg-blue-900 text-white text-sm font-medium px-4 py-1.5 rounded-full">
-                    {item}
-                  </span>
-                ))}
+                {INTEREST_OPTIONS.map((item) => {
+                  const selected = interests.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setInterests((prev) => selected ? prev.filter((i) => i !== item) : [...prev, item])}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                        selected
+                          ? "bg-blue-900 text-white border-blue-900"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-blue-900 hover:text-blue-900"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Pre-Professional Aspirations</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Pre-Professional Aspirations</h3>
               <div className="flex flex-wrap gap-2">
-                {profile.goals.map((item) => (
-                  <span key={item} className="bg-blue-900 text-white text-sm font-medium px-4 py-1.5 rounded-full">
-                    {item}
-                  </span>
-                ))}
+                {GOAL_OPTIONS.map((item) => {
+                  const selected = goals.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setGoals((prev) => selected ? prev.filter((g) => g !== item) : [...prev, item])}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                        selected
+                          ? "bg-blue-900 text-white border-blue-900"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-blue-900 hover:text-blue-900"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Hobbies</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Hobbies</h3>
               <div className="flex flex-wrap gap-2">
-                {profile.hobbies.map((item) => (
-                  <span key={item} className="bg-blue-900 text-white text-sm font-medium px-4 py-1.5 rounded-full">
-                    {item}
-                  </span>
-                ))}
+                {HOBBY_OPTIONS.map((item) => {
+                  const selected = hobbies.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setHobbies((prev) => selected ? prev.filter((h) => h !== item) : [...prev, item])}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                        selected
+                          ? "bg-blue-900 text-white border-blue-900"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-blue-900 hover:text-blue-900"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

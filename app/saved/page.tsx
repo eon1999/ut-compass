@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, setDoc, arrayRemove, updateDoc, deleteField } from "firebase/firestore";
@@ -115,7 +115,7 @@ function Sidebar({ user }: { user: User }) {
   ];
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
+    <aside className="relative z-10 w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
       <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
         <div className="relative h-10 w-10 overflow-hidden">
           <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
@@ -179,6 +179,14 @@ function SavedEventCard({
   onAddToGCal: (card: EventCard) => Promise<{ success: boolean; error?: string }>;
 }) {
   const [gcalStatus, setGcalStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [expanded, setExpanded] = useState(false);
+  const [isClamped, setIsClamped] = useState(false);
+  const descRef = useRef<HTMLDivElement | HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = descRef.current;
+    if (el) setIsClamped(el.scrollHeight > el.clientHeight);
+  }, [card.description, card.descriptionHtml]);
 
   async function handleGCal() {
     setGcalStatus("loading");
@@ -217,7 +225,7 @@ function SavedEventCard({
             className="shrink-0 text-lg leading-none"
             aria-label="Unsave event"
           >
-            🎣
+            <Fish className="h-6 w-6 text-[#1a3a5c]" />
           </button>
         </div>
 
@@ -236,11 +244,25 @@ function SavedEventCard({
 
         {card.descriptionHtml ? (
           <div
-            className="text-xs text-gray-500 mt-1 line-clamp-2 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden"
+            ref={descRef as React.RefObject<HTMLDivElement>}
+            className={`text-xs text-gray-500 mt-1 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden ${expanded ? "" : "line-clamp-3"}`}
             dangerouslySetInnerHTML={{ __html: card.descriptionHtml }}
           />
         ) : (
-          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+          <p
+            ref={descRef as React.RefObject<HTMLParagraphElement>}
+            className={`text-xs text-gray-500 mt-1 ${expanded ? "" : "line-clamp-3"}`}
+          >
+            {card.description}
+          </p>
+        )}
+        {(isClamped || expanded) && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs text-blue-600 hover:underline self-start mt-0.5"
+          >
+            {expanded ? "Show less" : "Show more"}
+          </button>
         )}
 
         <button
@@ -418,23 +440,32 @@ export default function Page() {
   const savedEvents = allEvents.filter((e) => savedIds.has(e.id));
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans">
+    <div className="relative flex min-h-screen font-sans">
+      <Image
+        src="/saved_events.png"
+        alt=""
+        fill
+        className="object-top"
+        priority
+      />
       <Sidebar user={currentUser} />
 
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="relative z-10 flex flex-col flex-1 min-w-0">
         <header className="flex items-center px-8 py-5 bg-white border-b border-gray-100">
-          <h1 className="text-2xl font-bold text-gray-900">Your Saved Events</h1>
+          <h1 className="text-2xl font-bold text-blue-900">Your Saved Events</h1>
         </header>
 
         <div className="px-8 py-6 flex-1">
           {loading && (
-            <p className="text-gray-400 text-center py-10">Loading...</p>
+            <p className="text-blue-900 text-center py-10">Loading...</p>
           )}
           {!loading && savedEvents.length === 0 && (
             <div className="flex flex-col items-center justify-center py-24 text-center">
-              <span className="text-4xl mb-3">🎣</span>
-              <p className="text-gray-500 text-base">No saved events yet.</p>
-              <p className="text-gray-400 text-sm mt-1">
+              <span className="text-4xl mb-3">
+                <Fish className="h-6 w-6 text-[#1a3a5c]" />
+              </span>
+              <p className="text-blue-900 text-base">No saved events yet.</p>
+              <p className="text-blue-900 text-sm mt-1">
                 Bookmark events from the dashboard to see them here.
               </p>
             </div>

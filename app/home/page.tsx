@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, arrayUnion, arrayRemove, setDoc, updateDoc, deleteField } from "firebase/firestore";
@@ -188,6 +188,15 @@ function SearchAndFilters({ excludeConflicting, onToggleExclude, searchQuery, on
 }
 
 function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: EventCard; isSaved: boolean; onToggleSave: (id: string) => void; isConflicting?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const [isClamped, setIsClamped] = useState(false);
+  const descRef = useRef<HTMLDivElement | HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = descRef.current;
+    if (el) setIsClamped(el.scrollHeight > el.clientHeight);
+  }, [card.description, card.descriptionHtml]);
+
   return (
     <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isConflicting ? "opacity-40 grayscale" : ""}`}>
       {/* Image placeholder */}
@@ -211,7 +220,11 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
             className="shrink-0 text-lg leading-none"
             aria-label={isSaved ? "Unsave event" : "Save event"}
           >
-            {isSaved ? "🎣" : "🐟"}
+            {isSaved ? (
+              <Fish className="h-6 w-6 fill-[#1a3a5c] text-[#1a3a5c]" />
+            ) : (
+              <Fish className="h-6 w-6 text-[#1a3a5c]" />
+            )}
           </button>
         </div>
 
@@ -237,11 +250,25 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
         {/* Description */}
         {card.descriptionHtml ? (
           <div
-            className="text-xs text-gray-500 mt-1 line-clamp-2 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden"
+            ref={descRef as React.RefObject<HTMLDivElement>}
+            className={`text-xs text-gray-500 mt-1 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden ${expanded ? "" : "line-clamp-3"}`}
             dangerouslySetInnerHTML={{ __html: card.descriptionHtml }}
           />
         ) : (
-          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{card.description}</p>
+          <p
+            ref={descRef as React.RefObject<HTMLParagraphElement>}
+            className={`text-xs text-gray-500 mt-1 ${expanded ? "" : "line-clamp-3"}`}
+          >
+            {card.description}
+          </p>
+        )}
+        {(isClamped || expanded) && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs text-blue-600 hover:underline self-start mt-0.5"
+          >
+            {expanded ? "Show less" : "Show more"}
+          </button>
         )}
       </div>
     </div>
