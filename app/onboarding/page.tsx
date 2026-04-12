@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Compass } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft, ArrowRight, Check, Compass, Fish, Bubbles } from "lucide-react";
 import { doc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 
@@ -457,8 +458,15 @@ export default function OnboardingPage() {
 
   return (
    <main className="min-h-screen bg-[#f4f4f6] lg:grid lg:grid-cols-2">
-      <section className="hidden bg-blue-900 p-10 lg:flex lg:flex-col">
-        <div className="inline-flex items-center gap-2 text-2xl font-more-sugar font-semibold text-[#f4f4f6]">
+      <section className="hidden relative bg-blue-900 p-10 lg:flex lg:flex-col overflow-hidden">
+        <Image
+          src="/onboarding.png"
+          alt=""
+          fill
+          className="object-cover object-left"
+          priority
+        />
+        <div className="relative z-10 inline-flex items-center gap-2 text-2xl font-more-sugar font-semibold text-[#f4f4f6]">
           <Compass className="h-7 w-7" />
           UT Compass
         </div>
@@ -486,16 +494,14 @@ export default function OnboardingPage() {
                 >
                   <span
                     title={step.label}
-                    className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
-                      isCompleted
-                        ? "border-blue-700 bg-blue-700 text-white"
-                        : isCurrent
-                          ? "border-blue-700 text-blue-700"
-                          : "border-gray-300 text-gray-400"
-                    }`}
+                    className="flex h-8 w-8 items-center justify-center"
                     aria-current={isCurrent ? "step" : undefined}
                   >
-                    {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
+                    {isCurrent ? (
+                      <Fish className="h-6 w-6 fill-[#1a3a5c] text-[#1a3a5c]" />
+                    ) : (
+                      <Bubbles className="h-6 w-6 text-[#1a3a5c]" />
+                    )}
                   </span>
                   {index < steps.length - 1 && (
                     <span

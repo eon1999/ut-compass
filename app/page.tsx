@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Mail, Lock, User } from "lucide-react";
 
 import {
@@ -74,8 +75,15 @@ export default function AuthenticationPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
+    <div className="relative min-h-screen flex items-center justify-center p-4">
+      <Image
+        src="/login.png"
+        alt=""
+        fill
+        className="object-cover object-left"
+        priority
+      />
+      <div className="relative z-10 w-full max-w-md bg-white rounded-lg shadow-lg p-8">
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -181,7 +189,7 @@ export default function AuthenticationPage() {
             disabled={loading}
             className="w-full bg-black text-white font-semibold py-2 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Loading..." : isLogin ? "Sign In" : "Create Account"}
+            {loading ? "Loading..." : isLogin ? "Log In" : "Create Account"}
           </button>
         </form>
 
