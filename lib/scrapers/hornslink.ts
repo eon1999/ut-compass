@@ -1,51 +1,6 @@
 import {fetch as undiciFetch, ProxyAgent} from "undici";
+import {FormattedEvent, RawEvent, RawOrganization} from "../interfaces";
 
-interface RawEvent {
-  organizationId: number;
-  id: string;
-  description?: string;
-  imagePath?: string;
-  organizationProfilePicture?: string;
-  name: string;
-  organizationName: string;
-  location: string;
-  startsOn: string;
-  endsOn: string;
-  theme?: string;
-  categoryNames?: string[];
-  benefitNames?: string[];
-}
-
-interface FormattedEvent {
-  id: string;
-  src: string;
-  content: {
-    title: string;
-    descriptionHtml: string;
-    descriptionText: string;
-    location: string;
-    startTime: string;
-    endTime: string;
-    theme: string;
-    categories: string[];
-    benefits: string[];
-    imageUrl: string | null;
-  };
-  organization: {
-    name: string;
-    id: string;
-  };
-}
-
-interface RawOrganization {
-  Id: string;
-  Name: string;
-  Description?: string;
-  WebsiteKey?: string;
-  Summary?: string;
-  ProfilePicture?: string;
-  CategoryNames?: string[];
-}
 
 const proxyAgent = new ProxyAgent(process.env.WEBSHARE_PROXY_URL!);
 
@@ -135,8 +90,17 @@ export async function scrapeHornsLinkOrganizations() {
     const descriptionHtml = org.Description || "No description provided.";
     const cleanDescription = descriptionHtml.replace(/<[^>]*>?/gm, "").replace(/&amp;/g, "&");
 
+    // slugify the organization name to create a doc ID for Firestore
+    const docId = org.Name
+      .toLowerCase()
+      .replace(/\//g, "_")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9\-_]/g, "");
+
     return {
-      id: `org_${org.Id}`,
+      id: docId,
+      hornslinkId: org.Id,
+      instagramHandle: null, // we'll have to manually curate this later
       name: org.Name,
       descriptionHtml: descriptionHtml,
       descriptionText: cleanDescription,

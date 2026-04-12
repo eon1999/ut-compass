@@ -11,22 +11,21 @@ import { db } from "./firebaseAdmin";
 
 interface EventData {
   id: string;
-  content: {
-    title: string;
-    [key: string]: string | string[] | number | boolean | null | undefined;
+  source?: string;
+  content?: {
+    title?: string;
+    [key: string]: any;
   };
-  [key: string]:
-    | string
-    | string[]
-    | number
-    | boolean
-    | null
-    | undefined
-    | object;
-  organization: {
-    name: string;
-    id: string;
+  extractedDetails?: {
+    title?: string | null;
+    [key: string]: any;
   };
+  organization?: {
+    name?: string;
+    id?: string;
+  };
+  organizationId?: string | null;
+  [key: string]: any;
 }
 
 interface OrganizationData {
@@ -52,9 +51,25 @@ export async function pushEventToFirestore(eventData: EventData) {
       .collection("events")
       .doc(eventData.id)
       .set(eventData, { merge: true });
-    // Use organizationName if available, but optional since title is the only strict requirement for logging here
+
+    let title = "Unknown";
+    let host = "Unknown";
+
+    if (eventData.source === "hornslink" && eventData.content) {
+      title = eventData.content.title || "Unknown";
+    } else if (eventData.source === "instagram" && eventData.extractedDetails) {
+      title = eventData.extractedDetails.title || "Unknown";
+    }
+
+    if (eventData.organization) {
+      host = eventData.organization.name || "Unknown";
+    } else if (eventData.organizationId) {
+      // Instagram event fallback
+      host = `Org ID: ${eventData.organizationId}`;
+    }
+
     console.log(
-      `Event with ID ${eventData.id}, Title: ${eventData.content.title || "Unknown"}, Host: ${eventData.organization.name || "Unknown"}, grabbed from: ${eventData.src} has been pushed to Firestore.`,
+      `Event with ID ${eventData.id}, Title: ${title}, Host: ${host}, grabbed from: ${eventData.source || "unknown"} has been pushed to Firestore.`,
     );
   } catch (error) {
     console.error(

@@ -1,4 +1,8 @@
-import { handleEventIngest, handleOrganizationIngest } from "@/lib/pipeline";
+import {
+  handleHornslinkEventIngest,
+  handleInstagramEventIngest,
+  handleOrganizationIngest,
+} from "@/lib/pipeline";
 
 export async function POST(request: Request) {
   // security check
@@ -15,20 +19,34 @@ export async function POST(request: Request) {
   console.log("Executing pipeline...");
 
   try {
-    const { includeOrganizations, overwrite } = await request.json();
+    const payload = await request.json();
 
-    console.log(
-      "Grabbed flag for organization ingestion:",
+    const includeOrganizations = payload.includeOrganizations ?? false;
+    const includeHornslinkEvents = payload.includeHornslinkEvents ?? true;
+    const includeInstagramEvents = payload.includeInstagramEvents ?? true;
+    const overwrite = payload.overwrite ?? false;
+
+    console.log("Pipeline Config:", {
       includeOrganizations,
-    );
-    console.log("Grabbed flag for overwrite:", overwrite);
+      includeHornslinkEvents,
+      includeInstagramEvents,
+      overwrite,
+    });
+
     if (includeOrganizations) {
-      console.log("Including organization ingestion in pipeline...");
+      console.log("Executing organization ingestion...");
       await handleOrganizationIngest();
     }
 
-    console.log("Executing event ingestion...");
-    await handleEventIngest(overwrite ?? false);
+    if (includeHornslinkEvents) {
+      console.log("Executing HornsLink event ingestion...");
+      await handleHornslinkEventIngest(overwrite);
+    }
+
+    if (includeInstagramEvents) {
+      console.log("Executing Instagram event ingestion...");
+      await handleInstagramEventIngest();
+    }
 
     return new Response("Pipeline completed successfully", { status: 200 });
   } catch (error) {

@@ -11,10 +11,28 @@ export async function getOrganizationsFromFirestore() {
 }
 
 export async function pullOrganizationsFromFirestore(): Promise<
-  Record<string, { description: string }>
+  Record<
+    string,
+    {
+      id: string;
+      name: string;
+      hornslinkId: string;
+      instagram_handle: string | null;
+      description: string;
+    }
+  >
 > {
   const orgsSnapshot = await db.collection("organizations").get();
-  const organizations: Record<string, { description: string }> = {};
+  const organizations: Record<
+    string,
+    {
+      id: string;
+      name: string;
+      hornslinkId: string;
+      instagram_handle: string | null;
+      description: string;
+    }
+  > = {};
   orgsSnapshot.forEach((doc) => {
     const orgData = doc.data();
     // in our record, we should hold all data we have about the org
@@ -22,7 +40,11 @@ export async function pullOrganizationsFromFirestore(): Promise<
     // save some space
     // we have access to the id of the organization from event schema
     // so we should key by id for easy lookup
-    organizations[doc.id] = {
+    organizations[orgData.hornslink_id] = {
+      id: doc.id,
+      name: orgData.name || "Unknown Organization",
+      hornslinkId: orgData.hornslink_id,
+      instagram_handle: orgData.instagram_handle || null,
       description:
         orgData.descriptionText ||
         orgData.descriptionHtml ||
