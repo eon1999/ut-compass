@@ -1,62 +1,47 @@
-// we'll use apify API to scrape instagram profiles for two things:
-// caption and alt text of the image (if it exists) — both of these are
-// super useful for our ml model to understand what the event is about
-
-// we'll have to manually curate a list of instagram profiles to scrape for each event, but since
-// organizations change infrequently, this won't be a big deal. we can just update this list every few months or so
-
-import { ApifyClient } from "apify-client";
+// Reads from a pre-populated Apify dataset via the Apify REST API.
+// Uses native fetch — no apify-client SDK needed, which avoids the
+// proxy-agent transitive dependency that breaks in serverless environments.
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN;
+const DEFAULT_DATASET_ID = "4lNFCWPdC5N6rVuiB";
 
-const apifyClient = new ApifyClient({
-  token: APIFY_TOKEN,
-});
+type ApifyDatasetItem = {
+  id: string;
+  caption?: string | null;
+  altText?: string | null;
+  ownerUsername?: string | null;
+  error?: string;
+};
 
-const defaultDatasetId = "4lNFCWPdC5N6rVuiB"; // placeholder
-
+// instagramHandles is accepted for API compatibility but the current
+// implementation reads from a fixed pre-populated Apify dataset.
 export async function scrapeInstagramEvents(instagramHandles: string[]) {
-  const input = {
-    addParentData: false,
-    directUrls: instagramHandles.map(
-      (handle) => `https://www.instagram.com/${handle}/`,
-    ),
-    onlyPostsNewerThan: "2 weeks",
-    resultsLimit: 5,
-    resultsType: "posts",
-    searchLimit: 1,
-    searchType: "hashtag",
-  };
+  void instagramHandles;
+  console.log("Pulling from Apify dataset with id:", DEFAULT_DATASET_ID);
 
+  const url = `https://api.apify.com/v2/datasets/${DEFAULT_DATASET_ID}/items?token=${APIFY_TOKEN}`;
+
+  let items: ApifyDatasetItem[];
   try {
-    // console.log("Starting Instagram scraping with Apify...");
-    console.log("Pulling from Apify dataset with id:", defaultDatasetId);
-
-    const datasetId =
-      input.resultsType === "posts" ? defaultDatasetId : "someOtherDatasetId";
-
-    const { items } = await apifyClient.dataset(datasetId).listItems();
-
-    console.log(`Fetched ${items.length} items from Apify dataset.`);
-
-    return items.map((item) => ({
-      id: item.id,
-      caption: item.caption || null,
-      altText: item.altText || null,
-      instagramHandle: item.ownerUsername || null,
-      error: item.error,
-    })) as {
-      id: string;
-      caption: string | null;
-      altText: string | null;
-      instagramHandle: string | null;
-      error?: string;
-    }[];
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Apify API responded with ${res.status} ${res.statusText}`);
+    }
+    items = (await res.json()) as ApifyDatasetItem[];
   } catch (error) {
     console.error("Error occurred while scraping Instagram:", error);
-
     throw new Error(
       `Instagram scraping failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+
+  console.log(`Fetched ${items.length} items from Apify dataset.`);
+
+  return items.map((item) => ({
+    id: item.id,
+    caption: item.caption ?? null,
+    altText: item.altText ?? null,
+    instagramHandle: item.ownerUsername ?? null,
+    error: item.error,
+  }));
 }
