@@ -8,6 +8,8 @@ import { Calendar, MapPin, House, Fish, Settings, Eye, User } from "lucide-react
 import Image from "next/image"
 import { db } from "@/lib/firebase";
 import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
+import { buildUserPreferences } from "@/lib/scoring/eventScorer";
+import { applyEventFilters, type SortBy, type SourceFilter } from "@/lib/filtering/eventFilter";
 
 interface Tag {
   label: string;
@@ -25,6 +27,11 @@ interface EventCard {
   descriptionHtml?: string;
   tags: Tag[];
   imageUrl?: string;
+  source?: string;
+  weights?: {
+    categories?: Record<string, number>;
+    majors?: Record<string, number>;
+  };
 }
 
 interface UpcomingEvent {
@@ -48,7 +55,7 @@ interface FirestoreTimestamp {
 interface DBEvent {
   id: string;
   src: string;
-  source?: "hornslink" | "manual";
+  source?: "hornslink" | "instagram" | "manual";
   scraped_at?: string;
   organization?: { name: string; id: string };
   content: {
@@ -65,6 +72,10 @@ interface DBEvent {
     confidence_score: number;
     all_scores: Record<string, number>;
     model_version: string;
+  };
+  weights?: {
+    categories?: Record<string, number>;
+    majors?: Record<string, number>;
   };
   manual_override: {
     is_forced: boolean;
@@ -154,7 +165,28 @@ function Header({ name, savedCount }: { name: string, savedCount: number }) {
   );
 }
 
-function SearchAndFilters({ excludeConflicting, onToggleExclude, searchQuery, onSearchChange }: { excludeConflicting: boolean; onToggleExclude: () => void; searchQuery: string; onSearchChange: (q: string) => void }) {
+function SearchAndFilters({
+  excludeConflicting,
+  onToggleExclude,
+  searchQuery,
+  onSearchChange,
+  sortBy,
+  onSortByChange,
+  sourceFilter,
+  onSourceFilterChange,
+}: {
+  excludeConflicting: boolean;
+  onToggleExclude: () => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  sortBy: SortBy;
+  onSortByChange: (v: SortBy) => void;
+  sourceFilter: SourceFilter;
+  onSourceFilterChange: (v: SourceFilter) => void;
+}) {
+  const selectClass =
+    "border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-700 bg-white outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer hover:bg-gray-50 transition appearance-none pr-8";
+
   return (
     <div className="flex gap-3 flex-wrap px-8 py-5">
       <input
@@ -164,14 +196,34 @@ function SearchAndFilters({ excludeConflicting, onToggleExclude, searchQuery, on
         placeholder="Search Clubs, Events, and More..."
         className="flex-1 min-w-48 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-200"
       />
-      {["Commitment", "Priority", "Interests"].map((filter) => (
-        <button
-          key={filter}
-          className="flex items-center gap-1 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+
+      <div className="relative">
+        <select
+          value={sortBy}
+          onChange={(e) => onSortByChange(e.target.value as SortBy)}
+          className={selectClass}
         >
-          {filter} <span className="text-gray-400">▾</span>
-        </button>
-      ))}
+          <option value="none">Sort: Default</option>
+          <option value="categoryMatch">Sort: Category Match</option>
+          <option value="majorMatch">Sort: Major Match</option>
+        </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+      </div>
+
+      <div className="relative">
+        <select
+          value={sourceFilter}
+          onChange={(e) => onSourceFilterChange(e.target.value as SourceFilter)}
+          className={selectClass}
+        >
+          <option value="all">Source: All</option>
+          <option value="hornslink">Source: HornsLink</option>
+          <option value="instagram">Source: Instagram</option>
+          <option value="manual">Source: Manual</option>
+        </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+      </div>
+
       <button
         onClick={onToggleExclude}
         className={`flex items-center gap-1 border rounded-full px-4 py-2 text-sm transition ${
@@ -181,7 +233,7 @@ function SearchAndFilters({ excludeConflicting, onToggleExclude, searchQuery, on
         }`}
       >
         Exclude Conflicting
-        <Eye className="h-4 w-4"></Eye>
+        <Eye className="h-4 w-4" />
       </button>
     </div>
   );
@@ -353,6 +405,8 @@ function mapDBEventToCard(event: DBEvent): EventCard {
       { label: primaryCategory },
       ...topTags,
     ],
+    source: event.source,
+    weights: event.weights,
   };
 }
 
@@ -582,12 +636,37 @@ function useEvents() {
   return { cards, loading, error };
 }
 
+function useUserProfile(uid?: string) {
+  const [userPrefs, setUserPrefs] = useState<Record<string, number>>({});
+  const [majorPrefs, setMajorPrefs] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!uid) return;
+    getDoc(doc(db, "users", uid)).then((snap) => {
+      const data = snap.data();
+      if (!data) return;
+      setUserPrefs(buildUserPreferences({
+        interests: data.interests,
+        goals: data.goals,
+        hobbies: data.hobbies,
+        major: data.major,
+      }));
+      setMajorPrefs(buildUserPreferences({ major: data.major }));
+    });
+  }, [uid]);
+
+  return { userPrefs, majorPrefs };
+}
+
 export default function Page() {
   const { cards, loading, error } = useEvents();
   const { user } = useAuth();
   const { savedIds, toggleSave, gcalEventIds, storeGcalEventId, removeGcalEventId } = useSavedEvents(user?.uid);
+  const { userPrefs, majorPrefs } = useUserProfile(user?.uid);
   const [excludeConflicting, setExcludeConflicting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortBy>("none");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [gcalPending, setGcalPending] = useState<EventCard | null>(null);
   const [unsavePending, setUnsavePending] = useState<EventCard | null>(null);
 
@@ -630,7 +709,7 @@ export default function Page() {
     }));
 
   const query = searchQuery.toLowerCase().trim();
-  const filteredCards = query
+  const searchedCards = query
     ? cards.filter((c) =>
         c.title.toLowerCase().includes(query) ||
         c.organization.toLowerCase().includes(query) ||
@@ -638,6 +717,13 @@ export default function Page() {
         c.tags.some((t) => t.label.toLowerCase().includes(query))
       )
     : cards;
+
+  const filteredCards = applyEventFilters(
+    searchedCards,
+    { sortBy, sourceFilter },
+    userPrefs,
+    majorPrefs,
+  );
 
   const savedCards = cards.filter((c) => savedIds.has(c.id));
   const conflictingIds = new Set(
@@ -668,7 +754,16 @@ export default function Page() {
 
         <Header name={currentUser.name.split(" ")[0]} savedCount={savedIds.size}/>
 
-        <SearchAndFilters excludeConflicting={excludeConflicting} onToggleExclude={() => setExcludeConflicting((v) => !v)} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+        <SearchAndFilters
+          excludeConflicting={excludeConflicting}
+          onToggleExclude={() => setExcludeConflicting((v) => !v)}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          sortBy={sortBy}
+          onSortByChange={setSortBy}
+          sourceFilter={sourceFilter}
+          onSourceFilterChange={setSourceFilter}
+        />
 
         {/* Main content + sidebar */}
         <div className="flex gap-6 px-8 pb-8 flex-1">
