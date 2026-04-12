@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { doc, getDoc, arrayUnion, arrayRemove, setDoc, updateDoc, deleteField } from "firebase/firestore";
+import { doc, getDoc, getFirestore, arrayUnion, arrayRemove, setDoc, updateDoc, deleteField } from "firebase/firestore";
+import { getApp, getApps } from "firebase/app";
 import { Calendar, MapPin, House, Fish, Settings, Eye, User } from "lucide-react";
 import Image from "next/image"
 import { db } from "@/lib/firebase";
@@ -549,18 +550,30 @@ function GCalUnsaveModal({
   );
 }
 
+/**
+ * Returns the real Firestore instance (not the lazy proxy).
+ * Safe to call inside useEffect / event handlers (browser-only).
+ * Falls back to the proxy `db` if no Firebase app is initialized yet.
+ */
+function getFirestoreInstance() {
+  if (getApps().length > 0) return getFirestore(getApp());
+  return db;
+}
+
 function useSavedEvents(userId: string | undefined) {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [gcalEventIds, setGcalEventIds] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!userId) return;
-    const userRef = doc(db, "users", userId);
-    getDoc(userRef).then((snap) => {
-      const data = snap.data();
-      if (data?.savedEventIds) setSavedIds(new Set(data.savedEventIds));
-      if (data?.gcalEventIds) setGcalEventIds(data.gcalEventIds ?? {});
-    });
+    const userRef = doc(getFirestoreInstance(), "users", userId);
+    getDoc(userRef)
+      .then((snap) => {
+        const data = snap.data();
+        if (data?.savedEventIds) setSavedIds(new Set(data.savedEventIds));
+        if (data?.gcalEventIds) setGcalEventIds(data.gcalEventIds ?? {});
+      })
+      .catch((err) => console.warn("useSavedEvents: failed to load saved events", err));
   }, [userId]);
 
   async function toggleSave(eventId: string) {
@@ -642,17 +655,19 @@ function useUserProfile(uid?: string) {
 
   useEffect(() => {
     if (!uid) return;
-    getDoc(doc(db, "users", uid)).then((snap) => {
-      const data = snap.data();
-      if (!data) return;
-      setUserPrefs(buildUserPreferences({
-        interests: data.interests,
-        goals: data.goals,
-        hobbies: data.hobbies,
-        major: data.major,
-      }));
-      setMajorPrefs(buildUserPreferences({ major: data.major }));
-    });
+    getDoc(doc(getFirestoreInstance(), "users", uid))
+      .then((snap) => {
+        const data = snap.data();
+        if (!data) return;
+        setUserPrefs(buildUserPreferences({
+          interests: data.interests,
+          goals: data.goals,
+          hobbies: data.hobbies,
+          major: data.major,
+        }));
+        setMajorPrefs(buildUserPreferences({ major: data.major }));
+      })
+      .catch((err) => console.warn("useUserProfile: failed to load user preferences", err));
   }, [uid]);
 
   return { userPrefs, majorPrefs };
