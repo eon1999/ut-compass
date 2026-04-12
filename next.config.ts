@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ["openai", "apify-client"],
+  serverExternalPackages: ["openai", "apify-client", "proxy-agent"],
 };
 
 export default nextConfig;
