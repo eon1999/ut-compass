@@ -12,7 +12,8 @@ import {
   Bubbles,
 } from "lucide-react";
 import { doc, setDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/context/AuthContext";
 
 type OnboardingFormData = {
   firstName: string;
@@ -297,6 +298,7 @@ const isStepValid = (
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<OnboardingFormData>(() => {
     if (typeof window === "undefined") {
@@ -414,7 +416,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    const uid = auth.currentUser?.uid;
+    const uid = user?.uid;
     if (!uid) {
       setSubmitted(false);
       return;
