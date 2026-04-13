@@ -304,10 +304,14 @@ function EventCardItem({
     <div
       className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isConflicting ? "opacity-40 grayscale" : ""}`}
     >
-      {/* Image placeholder */}
-      <div className="h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-sm">
-        {/* Replace with <Image> */}
-        [Event Image]
+      {/* Category image */}
+      <div className="h-36 relative overflow-hidden bg-gray-100">
+        <Image
+          src={getCategoryImage(card.tags[0])}
+          alt={getCategoryStyle(card.tags[0]).label}
+          fill
+          className="object-cover object-center"
+        />
       </div>
 
       <div className="p-4 flex flex-col gap-2 flex-1">
@@ -424,6 +428,27 @@ function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
       </div>
     </aside>
   );
+}
+
+const CATEGORY_IMAGES: Record<string, string> = {
+  technologyAndEngineering: "/category_images/tech_engineering.jpg",
+  academicAndResearch:      "/category_images/academic_research.jpg",
+  careerAndNetworking:      "/category_images/career_networking.jpg",
+  healthAndWellness:        "/category_images/health_wellness.jpg",
+  socialAndCommunity:       "/category_images/social_community.jpg",
+  artsAndPerformance:       "/category_images/arts_performance.jpg",
+  music:                    "/category_images/music.jpg",
+  politicsAndAdvocacy:      "/category_images/politics_advocacy.jpg",
+  culturalAndInternational: "/category_images/cultural_international.jpg",
+  volunteerAndService:      "/category_images/volunteer_service.jpg",
+  sportsAndRecreation:      "/category_images/sports_recreation.jpg",
+  foodAndDrinks:            "/category_images/food_drinks.jpg",
+  faithAndSpirituality:     "/category_images/faith_spirituality.jpg",
+  gamingAndEsports:         "/category_images/gaming_esports.jpg",
+};
+
+function getCategoryImage(category: string): string {
+  return CATEGORY_IMAGES[category] ?? "/category_images/social_community.jpg";
 }
 
 function parseStartTime(start_time: string | FirestoreTimestamp): Date {
