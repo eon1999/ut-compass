@@ -433,6 +433,7 @@ export default function OnboardingPage() {
     );
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     setSubmitted(true);
+    router.push("/profile");
   };
 
   if (submitted) {
