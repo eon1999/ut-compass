@@ -4,7 +4,7 @@
 import OpenAI from "openai";
 import { pullOrganizationsFromFirestore } from "@/lib/db/pullFromFirestore";
 
-const MODEL = "google/gemma-4-31b-it:free";
+const MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 
 const CHAT_MAX_RETRIES = 5;
 const CHAT_BASE_DELAY_MS = 2000;

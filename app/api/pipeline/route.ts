@@ -4,6 +4,10 @@ import {
   handleOrganizationIngest,
 } from "@/lib/pipeline";
 
+// Set the max duration for Vercel (in seconds)
+// Note: Maximum is 60 for Hobby, 300 for Pro, 900 for Enterprise
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
   // security check
   console.log("Checking authorization for pipeline trigger...");
