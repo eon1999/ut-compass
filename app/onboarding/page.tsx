@@ -12,7 +12,7 @@ import {
   Bubbles,
 } from "lucide-react";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/lib/context/AuthContext";
 
 type OnboardingFormData = {
@@ -427,7 +427,7 @@ export default function OnboardingPage() {
       submittedAt: new Date().toISOString(),
     };
 
-    await setDoc(doc(db, "users", uid), payload);
+    await setDoc(doc(getDb(), "users", uid), payload);
 
     window.localStorage.setItem(
       SUBMISSION_STORAGE_KEY,
