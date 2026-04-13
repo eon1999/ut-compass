@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { getDb, storage } from "@/lib/firebase";
 import { useAuth } from "@/lib/context/AuthContext";
 import { House, Fish, Settings, User, Camera } from "lucide-react";
 import Image from "next/image";
@@ -161,7 +161,7 @@ export default function ProfilePage() {
       return;
     }
 
-    getDoc(doc(db, "users", user.uid)).then((snap) => {
+    getDoc(doc(getDb(), "users", user.uid)).then((snap) => {
       if (snap.exists()) {
         const data = snap.data() as UserProfile;
         setProfile(data);
@@ -188,7 +188,7 @@ export default function ProfilePage() {
       const storageRef = ref(storage, `profilePictures/${user.uid}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
-      await updateDoc(doc(db, "users", user.uid), { avatarUrl: url });
+      await updateDoc(doc(getDb(), "users", user.uid), { avatarUrl: url });
       setAvatarUrl(url);
       setProfile((prev) => prev ? { ...prev, avatarUrl: url } : prev);
     } finally {
@@ -201,7 +201,7 @@ export default function ProfilePage() {
   async function handleSave() {
     if (!user || !profile) return;
     setSaving(true);
-    await updateDoc(doc(db, "users", user.uid), {
+    await updateDoc(doc(getDb(), "users", user.uid), {
       firstName,
       lastName,
       yearClassification,

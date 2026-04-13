@@ -77,3 +77,12 @@ function lazyServiceProxy<T extends object>(getInstance: () => T): T {
 export const auth = lazyServiceProxy(getAuthSingleton);
 export const db = lazyServiceProxy(getDbSingleton);
 export const storage = lazyServiceProxy(getStorageSingleton);
+
+/**
+ * Returns the real Firestore instance. Use this (instead of `db`) when passing
+ * to Firestore modular API functions like doc(), collection(), etc., which do
+ * instanceof checks that a Proxy cannot satisfy.
+ */
+export function getDb(): Firestore {
+  return getDbSingleton();
+}

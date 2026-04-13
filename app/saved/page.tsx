@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, setDoc, arrayRemove, updateDoc, deleteField } from "firebase/firestore";
 import { Calendar, MapPin, House, Fish, Settings, User } from "lucide-react";
 import Image from "next/image"
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
 
 interface Tag {
@@ -361,7 +361,7 @@ export default function Page() {
   // Load saved IDs and GCal event IDs from Firestore
   useEffect(() => {
     if (!user?.uid) return;
-    const userRef = doc(db, "users", user.uid);
+    const userRef = doc(getDb(), "users", user.uid);
     getDoc(userRef).then((snap) => {
       const data = snap.data();
       if (data?.savedEventIds) setSavedIds(new Set(data.savedEventIds));
@@ -374,7 +374,7 @@ export default function Page() {
     fetch("/api/events")
       .then((res) => res.json())
       .then((data: DBEvent[]) => {
-        setAllEvents(data.map(mapDBEventToCard));
+        setAllEvents(data.filter((e) => e.content?.startTime).map(mapDBEventToCard));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -389,7 +389,7 @@ export default function Page() {
     });
     if (result.success && result.gcalEventId && user?.uid) {
       setGcalEventIds((prev) => ({ ...prev, [card.id]: result.gcalEventId! }));
-      const userRef = doc(db, "users", user.uid);
+      const userRef = doc(getDb(), "users", user.uid);
       try {
         await updateDoc(userRef, { [`gcalEventIds.${card.id}`]: result.gcalEventId });
       } catch {
@@ -406,7 +406,7 @@ export default function Page() {
       next.delete(eventId);
       return next;
     });
-    const userRef = doc(db, "users", user.uid);
+    const userRef = doc(getDb(), "users", user.uid);
     await setDoc(userRef, { savedEventIds: arrayRemove(eventId) }, { merge: true });
   }
 
@@ -423,7 +423,7 @@ export default function Page() {
         delete next[eventId];
         return next;
       });
-      const userRef = doc(db, "users", user.uid);
+      const userRef = doc(getDb(), "users", user.uid);
       await updateDoc(userRef, { [`gcalEventIds.${eventId}`]: deleteField() });
     }
     await handleUnsave(eventId);

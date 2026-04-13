@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { doc, getDoc, getFirestore, arrayUnion, arrayRemove, setDoc, updateDoc, deleteField } from "firebase/firestore";
-import { getApp, getApps } from "firebase/app";
+import { doc, getDoc, arrayUnion, arrayRemove, setDoc, updateDoc, deleteField } from "firebase/firestore";
 import { Calendar, MapPin, House, Fish, Settings, Eye, User } from "lucide-react";
 import Image from "next/image"
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
 import { buildUserPreferences } from "@/lib/scoring/eventScorer";
 import { applyEventFilters, type SortBy, type SourceFilter } from "@/lib/filtering/eventFilter";
@@ -553,11 +552,9 @@ function GCalUnsaveModal({
 /**
  * Returns the real Firestore instance (not the lazy proxy).
  * Safe to call inside useEffect / event handlers (browser-only).
- * Falls back to the proxy `db` if no Firebase app is initialized yet.
  */
 function getFirestoreInstance() {
-  if (getApps().length > 0) return getFirestore(getApp());
-  return db;
+  return getDb();
 }
 
 function useSavedEvents(userId: string | undefined) {
@@ -578,7 +575,7 @@ function useSavedEvents(userId: string | undefined) {
 
   async function toggleSave(eventId: string) {
     if (!userId) return;
-    const userRef = doc(db, "users", userId);
+    const userRef = doc(getDb(), "users", userId);
     const isSaved = savedIds.has(eventId);
     setSavedIds((prev) => {
       const next = new Set(prev);
@@ -602,7 +599,7 @@ function useSavedEvents(userId: string | undefined) {
   async function storeGcalEventId(appEventId: string, gcalEventId: string) {
     if (!userId) return;
     setGcalEventIds((prev) => ({ ...prev, [appEventId]: gcalEventId }));
-    const userRef = doc(db, "users", userId);
+    const userRef = doc(getDb(), "users", userId);
     try {
       await updateDoc(userRef, { [`gcalEventIds.${appEventId}`]: gcalEventId });
     } catch {
@@ -618,7 +615,7 @@ function useSavedEvents(userId: string | undefined) {
       delete next[appEventId];
       return next;
     });
-    const userRef = doc(db, "users", userId);
+    const userRef = doc(getDb(), "users", userId);
     await updateDoc(userRef, { [`gcalEventIds.${appEventId}`]: deleteField() });
   }
 
@@ -636,7 +633,7 @@ function useEvents() {
         const res = await fetch("/api/events"); 
         if (!res.ok) throw new Error("Failed to fetch events");
         const data: DBEvent[] = await res.json();
-        setCards(data.map(mapDBEventToCard));
+        setCards(data.filter((e) => e.content?.startTime).map(mapDBEventToCard));
       } catch (err) {
         setError((err as Error).message);
       } finally {
