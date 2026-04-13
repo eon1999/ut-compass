@@ -3,13 +3,36 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { doc, getDoc, arrayUnion, arrayRemove, setDoc, updateDoc, deleteField } from "firebase/firestore";
-import { Calendar, MapPin, House, Fish, Settings, Eye, User } from "lucide-react";
-import Image from "next/image"
+import {
+  doc,
+  getDoc,
+  arrayUnion,
+  arrayRemove,
+  setDoc,
+  updateDoc,
+  deleteField,
+} from "firebase/firestore";
+import {
+  Calendar,
+  MapPin,
+  House,
+  Fish,
+  Settings,
+  Eye,
+  User,
+} from "lucide-react";
+import Image from "next/image";
 import { getDb } from "@/lib/firebase";
-import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
+import {
+  addToGoogleCalendar,
+  deleteFromGoogleCalendar,
+} from "@/lib/googleCalendar";
 import { buildUserPreferences } from "@/lib/scoring/eventScorer";
-import { applyEventFilters, type SortBy, type SourceFilter } from "@/lib/filtering/eventFilter";
+import {
+  applyEventFilters,
+  type SortBy,
+  type SourceFilter,
+} from "@/lib/filtering/eventFilter";
 import { getCategoryStyle } from "@/lib/categories";
 
 interface EventCard {
@@ -87,8 +110,7 @@ function Sidebar({ user }: { user: User }) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: House, route: "/home" },
     { id: "saved", label: "Your Saved", icon: Fish, route: "/saved" },
-    { id: "settings", label: "Settings", icon: Settings, route: "/profile"},
-
+    { id: "settings", label: "Settings", icon: Settings, route: "/profile" },
   ];
 
   return (
@@ -96,7 +118,12 @@ function Sidebar({ user }: { user: User }) {
       {/* Logo */}
       <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
         <div className="relative h-10 w-10 overflow-hidden">
-          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
+          <Image
+            src="/ut-compass.svg"
+            alt="UT Compass logo"
+            fill
+            className="object-cover scale-120 origin-center"
+          />
         </div>
         <span className="text-xl font-more-sugar font-bold">UT Compass</span>
       </div>
@@ -113,7 +140,7 @@ function Sidebar({ user }: { user: User }) {
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
-          <item.icon className="h-4 w-4" />
+            <item.icon className="h-4 w-4" />
             {item.label}
           </button>
         ))}
@@ -126,17 +153,23 @@ function Sidebar({ user }: { user: User }) {
             <User className="h-6 w-6"></User>
           </div>
           <div className="overflow-hidden">
-            <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {user.name}
+            </p>
             <p className="text-xs text-gray-400 truncate">{user.email}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="flex-1 border border-gray-300 rounded-lg py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition"
-                  onClick={() => router.push("/profile")}>
+          <button
+            className="flex-1 border border-gray-300 rounded-lg py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition"
+            onClick={() => router.push("/profile")}
+          >
             Edit Profile
           </button>
-          <button className="flex-1 bg-blue-900 text-white rounded-lg py-1.5 text-sm hover:bg-blue-800 transition"
-                  onClick={() => router.push("..")}>
+          <button
+            className="flex-1 bg-blue-900 text-white rounded-lg py-1.5 text-sm hover:bg-blue-800 transition"
+            onClick={() => router.push("..")}
+          >
             Logout
           </button>
         </div>
@@ -145,10 +178,15 @@ function Sidebar({ user }: { user: User }) {
   );
 }
 
-function Header({ name, savedCount }: { name: string, savedCount: number }) {
+function Header({ name, savedCount }: { name: string; savedCount: number }) {
   return (
     <div className="relative w-full h-64 flex flex-col justify-between pb-4.5 px-8 py-3 overflow-hidden">
-      <Image src="/banner.png" alt="Ocean waves background scene" fill className="object-cover [object-position:center_65%]"/>
+      <Image
+        src="/banner.png"
+        alt="Ocean waves background scene"
+        fill
+        className="object-cover [object-position:center_65%]"
+      />
 
       <div className="relative z-10 flex justify-end items-center gap-3">
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700">
@@ -157,7 +195,9 @@ function Header({ name, savedCount }: { name: string, savedCount: number }) {
         </div>
       </div>
 
-      <h1 className="relative z-10 text-4xl font-more-sugar font-bold text-white">Ahoy, {name}!</h1>
+      <h1 className="relative z-10 text-4xl font-more-sugar font-bold text-white">
+        Ahoy, {name}!
+      </h1>
     </div>
   );
 }
@@ -204,7 +244,9 @@ function SearchAndFilters({
           <option value="categoryMatch">Sort: Category Match</option>
           <option value="majorMatch">Sort: Major Match</option>
         </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+          ▾
+        </span>
       </div>
 
       <div className="relative">
@@ -218,7 +260,9 @@ function SearchAndFilters({
           <option value="instagram">Source: Instagram</option>
           <option value="manual">Source: Manual</option>
         </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▾</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+          ▾
+        </span>
       </div>
 
       <button
@@ -236,7 +280,17 @@ function SearchAndFilters({
   );
 }
 
-function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: EventCard; isSaved: boolean; onToggleSave: (id: string) => void; isConflicting?: boolean }) {
+function EventCardItem({
+  card,
+  isSaved,
+  onToggleSave,
+  isConflicting,
+}: {
+  card: EventCard;
+  isSaved: boolean;
+  onToggleSave: (id: string) => void;
+  isConflicting?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [isClamped, setIsClamped] = useState(false);
   const descRef = useRef<HTMLDivElement | HTMLParagraphElement>(null);
@@ -247,7 +301,9 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
   }, [card.description, card.descriptionHtml]);
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isConflicting ? "opacity-40 grayscale" : ""}`}>
+    <div
+      className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isConflicting ? "opacity-40 grayscale" : ""}`}
+    >
       {/* Image placeholder */}
       <div className="h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-sm">
         {/* Replace with <Image> */}
@@ -261,7 +317,10 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
             {card.tags.map((key) => {
               const cat = getCategoryStyle(key);
               return (
-                <span key={key} className={`text-xs font-medium px-2.5 py-1 rounded-full ${cat.bg} ${cat.text}`}>
+                <span
+                  key={key}
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${cat.bg} ${cat.text}`}
+                >
                   {cat.label}
                 </span>
               );
@@ -281,7 +340,9 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
         </div>
 
         {/* Title */}
-        <h3 className="font-bold text-gray-900 text-base leading-snug">{card.title}</h3>
+        <h3 className="font-bold text-gray-900 text-base leading-snug">
+          {card.title}
+        </h3>
 
         {/* Organization Name */}
         <h4 className="text-xs text-gray-700 text-base">{card.organization}</h4>
@@ -290,8 +351,8 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
         <div className="flex flex-col gap-1 text-xs text-blue-600">
           {/* Replace with illustration */}
           <span className="flex items-center gap-1">
-              <Calendar className="h-4 w-4"></Calendar>
-              {card.date}
+            <Calendar className="h-4 w-4"></Calendar>
+            {card.date}
           </span>
           <span className="flex items-center gap-1">
             <MapPin className="h-4 w-4"></MapPin>
@@ -340,8 +401,13 @@ function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
 
         <div className="flex flex-col gap-3">
           {events.map((event) => (
-            <div key={event.id} className="border border-gray-100 rounded-xl p-3 hover:bg-gray-50 transition cursor-pointer">
-              <p className="font-semibold text-sm text-gray-800 mb-2 leading-snug">{event.title}</p>
+            <div
+              key={event.id}
+              className="border border-gray-100 rounded-xl p-3 hover:bg-gray-50 transition cursor-pointer"
+            >
+              <p className="font-semibold text-sm text-gray-800 mb-2 leading-snug">
+                {event.title}
+              </p>
               <div className="mt-2 flex flex-col gap-0.5 text-xs text-gray-500">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4"></Calendar>
@@ -380,7 +446,9 @@ function mapDBEventToCard(event: DBEvent): EventCard {
   const primaryCategory =
     event.tags?.primary_category ??
     (event.weights?.categories
-      ? Object.entries(event.weights.categories).sort(([, a], [, b]) => b - a)[0]?.[0]
+      ? Object.entries(event.weights.categories).sort(
+          ([, a], [, b]) => b - a,
+        )[0]?.[0]
       : undefined) ??
     "other";
 
@@ -413,7 +481,9 @@ function GCalModal({
   onConfirm: () => Promise<void>;
   onDismiss: () => void;
 }) {
-  const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "success" | "error">(
+    "idle",
+  );
 
   async function handleConfirm() {
     setState("loading");
@@ -447,8 +517,8 @@ function GCalModal({
             </h2>
             <p className="text-sm text-gray-500 mb-4">
               Add{" "}
-              <span className="font-medium text-gray-700">{card.title}</span>{" "}
-              to your Google Calendar.
+              <span className="font-medium text-gray-700">{card.title}</span> to
+              your Google Calendar.
             </p>
             {state === "error" && (
               <p className="text-xs text-red-500 mb-3">
@@ -516,11 +586,13 @@ function GCalUnsaveModal({
         </h2>
         <p className="text-sm text-gray-500 mb-4">
           You added{" "}
-          <span className="font-medium text-gray-700">{card.title}</span>{" "}
-          to Google Calendar. Would you like to remove it too?
+          <span className="font-medium text-gray-700">{card.title}</span> to
+          Google Calendar. Would you like to remove it too?
         </p>
         {state === "error" && (
-          <p className="text-xs text-red-500 mb-3">Something went wrong. Please try again.</p>
+          <p className="text-xs text-red-500 mb-3">
+            Something went wrong. Please try again.
+          </p>
         )}
         <div className="flex flex-col gap-2">
           <button
@@ -564,7 +636,9 @@ function useSavedEvents(userId: string | undefined) {
         if (data?.savedEventIds) setSavedIds(new Set(data.savedEventIds));
         if (data?.gcalEventIds) setGcalEventIds(data.gcalEventIds ?? {});
       })
-      .catch((err) => console.warn("useSavedEvents: failed to load saved events", err));
+      .catch((err) =>
+        console.warn("useSavedEvents: failed to load saved events", err),
+      );
   }, [userId]);
 
   async function toggleSave(eventId: string) {
@@ -578,7 +652,11 @@ function useSavedEvents(userId: string | undefined) {
       return next;
     });
     try {
-      await setDoc(userRef, { savedEventIds: isSaved ? arrayRemove(eventId) : arrayUnion(eventId) }, { merge: true });
+      await setDoc(
+        userRef,
+        { savedEventIds: isSaved ? arrayRemove(eventId) : arrayUnion(eventId) },
+        { merge: true },
+      );
     } catch {
       // revert on error
       setSavedIds((prev) => {
@@ -598,7 +676,11 @@ function useSavedEvents(userId: string | undefined) {
       await updateDoc(userRef, { [`gcalEventIds.${appEventId}`]: gcalEventId });
     } catch {
       // doc may not exist yet — fall back to setDoc merge
-      await setDoc(userRef, { gcalEventIds: { [appEventId]: gcalEventId } }, { merge: true });
+      await setDoc(
+        userRef,
+        { gcalEventIds: { [appEventId]: gcalEventId } },
+        { merge: true },
+      );
     }
   }
 
@@ -613,7 +695,13 @@ function useSavedEvents(userId: string | undefined) {
     await updateDoc(userRef, { [`gcalEventIds.${appEventId}`]: deleteField() });
   }
 
-  return { savedIds, toggleSave, gcalEventIds, storeGcalEventId, removeGcalEventId };
+  return {
+    savedIds,
+    toggleSave,
+    gcalEventIds,
+    storeGcalEventId,
+    removeGcalEventId,
+  };
 }
 
 function useEvents() {
@@ -624,10 +712,12 @@ function useEvents() {
   useEffect(() => {
     async function fetchEvents() {
       try {
-        const res = await fetch("/api/events"); 
+        const res = await fetch("/api/events");
         if (!res.ok) throw new Error("Failed to fetch events");
         const data: DBEvent[] = await res.json();
-        setCards(data.filter((e) => e.content?.startTime).map(mapDBEventToCard));
+        setCards(
+          data.filter((e) => e.content?.startTime).map(mapDBEventToCard),
+        );
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -650,15 +740,19 @@ function useUserProfile(uid?: string) {
       .then((snap) => {
         const data = snap.data();
         if (!data) return;
-        setUserPrefs(buildUserPreferences({
-          interests: data.interests,
-          goals: data.goals,
-          hobbies: data.hobbies,
-          major: data.major,
-        }));
+        setUserPrefs(
+          buildUserPreferences({
+            interests: data.interests,
+            goals: data.goals,
+            hobbies: data.hobbies,
+            major: data.major,
+          }),
+        );
         setMajorPrefs(buildUserPreferences({ major: data.major }));
       })
-      .catch((err) => console.warn("useUserProfile: failed to load user preferences", err));
+      .catch((err) =>
+        console.warn("useUserProfile: failed to load user preferences", err),
+      );
   }, [uid]);
 
   return { userPrefs, majorPrefs };
@@ -667,7 +761,13 @@ function useUserProfile(uid?: string) {
 export default function Page() {
   const { cards, loading, error } = useEvents();
   const { user } = useAuth();
-  const { savedIds, toggleSave, gcalEventIds, storeGcalEventId, removeGcalEventId } = useSavedEvents(user?.uid);
+  const {
+    savedIds,
+    toggleSave,
+    gcalEventIds,
+    storeGcalEventId,
+    removeGcalEventId,
+  } = useSavedEvents(user?.uid);
   const { userPrefs, majorPrefs } = useUserProfile(user?.uid);
   const [excludeConflicting, setExcludeConflicting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -676,14 +776,18 @@ export default function Page() {
   const [gcalPending, setGcalPending] = useState<EventCard | null>(null);
   const [unsavePending, setUnsavePending] = useState<EventCard | null>(null);
 
-  const isGoogleUser = user?.providerData.some((p) => p.providerId === "google.com") ?? false;
+  const isGoogleUser =
+    user?.providerData.some((p) => p.providerId === "google.com") ?? false;
 
   async function handleToggleSave(eventId: string) {
     const wasAlreadySaved = savedIds.has(eventId);
     if (wasAlreadySaved) {
       if (isGoogleUser && gcalEventIds[eventId]) {
         const card = cards.find((c) => c.id === eventId);
-        if (card) { setUnsavePending(card); return; }
+        if (card) {
+          setUnsavePending(card);
+          return;
+        }
       }
       await toggleSave(eventId);
     } else {
@@ -705,7 +809,12 @@ export default function Page() {
   const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const upcomingEvents: UpcomingEvent[] = cards
-    .filter((c) => savedIds.has(c.id) && c.startTime >= now && c.startTime <= sevenDaysLater)
+    .filter(
+      (c) =>
+        savedIds.has(c.id) &&
+        c.startTime >= now &&
+        c.startTime <= sevenDaysLater,
+    )
     .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
     .map((c) => ({
       id: c.id,
@@ -716,11 +825,14 @@ export default function Page() {
 
   const query = searchQuery.toLowerCase().trim();
   const searchedCards = query
-    ? cards.filter((c) =>
-        c.title.toLowerCase().includes(query) ||
-        c.organization.toLowerCase().includes(query) ||
-        c.location.toLowerCase().includes(query) ||
-        c.tags.some((t) => getCategoryStyle(t).label.toLowerCase().includes(query))
+    ? cards.filter(
+        (c) =>
+          c.title.toLowerCase().includes(query) ||
+          c.organization.toLowerCase().includes(query) ||
+          c.location.toLowerCase().includes(query) ||
+          c.tags.some((t) =>
+            getCategoryStyle(t).label.toLowerCase().includes(query),
+          ),
       )
     : cards;
 
@@ -737,12 +849,15 @@ export default function Page() {
       .filter((card) => !savedIds.has(card.id))
       .filter((card) =>
         savedCards.some((saved) => {
-          const cardEnd = card.endTime ?? new Date(card.startTime.getTime() + 60 * 60 * 1000);
-          const savedEnd = saved.endTime ?? new Date(saved.startTime.getTime() + 60 * 60 * 1000);
+          const cardEnd =
+            card.endTime ?? new Date(card.startTime.getTime() + 60 * 60 * 1000);
+          const savedEnd =
+            saved.endTime ??
+            new Date(saved.startTime.getTime() + 60 * 60 * 1000);
           return card.startTime < savedEnd && cardEnd > saved.startTime;
-        })
+        }),
       )
-      .map((c) => c.id)
+      .map((c) => c.id),
   );
 
   return (
@@ -758,7 +873,10 @@ export default function Page() {
           </div>
         </header> */}
 
-        <Header name={currentUser.name.split(" ")[0]} savedCount={savedIds.size}/>
+        <Header
+          name={currentUser.name.split(" ")[0]}
+          savedCount={savedIds.size}
+        />
 
         <SearchAndFilters
           excludeConflicting={excludeConflicting}
@@ -775,17 +893,29 @@ export default function Page() {
         <div className="flex gap-6 px-8 pb-8 flex-1">
           {/* Cards grid */}
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 content-start">
-            {loading && <p className="text-gray-400 col-span-3 text-center py-10">Loading events...</p>}
-            {error && <p className="text-red-500 col-span-3 text-center py-10">{error}</p>}
-            {!loading && !error && filteredCards.map((card) => (
-              <EventCardItem
-                key={card.id}
-                card={card}
-                isSaved={savedIds.has(card.id)}
-                onToggleSave={handleToggleSave}
-                isConflicting={excludeConflicting && conflictingIds.has(card.id)}
-              />
-            ))}
+            {loading && (
+              <p className="text-gray-400 col-span-3 text-center py-10">
+                Loading events...
+              </p>
+            )}
+            {error && (
+              <p className="text-red-500 col-span-3 text-center py-10">
+                {error}
+              </p>
+            )}
+            {!loading &&
+              !error &&
+              filteredCards.map((card) => (
+                <EventCardItem
+                  key={card.id}
+                  card={card}
+                  isSaved={savedIds.has(card.id)}
+                  onToggleSave={handleToggleSave}
+                  isConflicting={
+                    excludeConflicting && conflictingIds.has(card.id)
+                  }
+                />
+              ))}
           </div>
 
           {/* Upcoming events */}
@@ -818,7 +948,8 @@ export default function Page() {
             const gcalEventId = gcalEventIds[unsavePending.id];
             if (gcalEventId) {
               const result = await deleteFromGoogleCalendar(gcalEventId);
-              if (!result.success && result.error !== "cancelled") throw new Error(result.error);
+              if (!result.success && result.error !== "cancelled")
+                throw new Error(result.error);
             }
             await toggleSave(unsavePending.id);
             await removeGcalEventId(unsavePending.id);

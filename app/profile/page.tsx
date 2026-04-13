@@ -42,7 +42,12 @@ function Sidebar({ user }: { user: SidebarUser }) {
     <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
       <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
         <div className="relative h-10 w-10 overflow-hidden">
-          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
+          <Image
+            src="/ut-compass.svg"
+            alt="UT Compass logo"
+            fill
+            className="object-cover scale-120 origin-center"
+          />
         </div>
         <span className="text-xl font-more-sugar font-bold">UT Compass</span>
       </div>
@@ -68,13 +73,21 @@ function Sidebar({ user }: { user: SidebarUser }) {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 overflow-hidden">
             {user.avatarUrl ? (
-              <Image src={user.avatarUrl} alt="Profile" width={40} height={40} className="w-full h-full object-cover" />
+              <Image
+                src={user.avatarUrl}
+                alt="Profile"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <User className="h-6 w-6" />
             )}
           </div>
           <div className="overflow-hidden">
-            <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {user.name}
+            </p>
             <p className="text-xs text-gray-400 truncate">{user.email}</p>
           </div>
         </div>
@@ -100,34 +113,191 @@ function Sidebar({ user }: { user: SidebarUser }) {
 const YEAR_OPTIONS = ["Freshman", "Sophomore", "Junior", "Senior"];
 
 const INTEREST_OPTIONS = [
-  "Mechanical Engineering", "Software Development", "UX/UI Design", "Politics",
-  "Business Administration", "Architecture", "Informatics", "Nursing",
-  "Education", "Liberal Arts", "Fine Arts", "Communications", "Mathematics", "Product Management",
+  "Mechanical Engineering",
+  "Software Development",
+  "UX/UI Design",
+  "Politics",
+  "Business Administration",
+  "Architecture",
+  "Informatics",
+  "Nursing",
+  "Education",
+  "Liberal Arts",
+  "Fine Arts",
+  "Communications",
+  "Mathematics",
+  "Product Management",
 ];
 
 const GOAL_OPTIONS = [
-  "Gaining technical skills", "Seeking internships", "Research opportunities",
-  "Leadership positions", "Pre-law", "Pre-health", "Certifications",
-  "On-site training", "Build a startup", "Connect with peers", "Interview practice", "Industry experience",
+  "Gaining technical skills",
+  "Seeking internships",
+  "Research opportunities",
+  "Leadership positions",
+  "Pre-law",
+  "Pre-health",
+  "Certifications",
+  "On-site training",
+  "Build a startup",
+  "Connect with peers",
+  "Interview practice",
+  "Industry experience",
 ];
 
 const HOBBY_OPTIONS = [
-  "Playing music", "Drawing/painting", "Reading", "Socializing",
-  "Crocheting", "Cafe-hopping", "Hiking", "Running",
+  "Playing music",
+  "Drawing/painting",
+  "Reading",
+  "Socializing",
+  "Crocheting",
+  "Cafe-hopping",
+  "Hiking",
+  "Running",
 ];
 
 const schoolOptions: Record<string, string[]> = {
-  "School of Architecture": ["Architectural Studies", "Architecture", "Architecture/Architectural Engineering", "Interior Design"],
-  "McCombs School of Business": ["Accounting", "Business Analytics", "Canfield Business Honors Program", "Finance", "International Business", "Management", "Management Information Systems", "Marketing", "Supply Chain Management"],
-  "School of Civic Leadership": ["Civics Honors", "Great Books Honors", "Strategy and Statecraft"],
-  "Moody College of Communication": ["Advertising", "Communication and Leadership", "Communication Studies", "Journalism", "Public Relations", "Radio-Television-Film", "Speech, Language, and Hearing Sciences", "Undeclared (Communication)"],
-  "College of Education": ["Education", "Kinesiology and Health", "Athletic Training"],
-  "Cockrell School of Engineering": ["Aerospace Engineering", "Architectural Engineering", "Biomedical Engineering", "Chemical Engineering", "Civil Engineering", "Computational Engineering", "Electrical and Computer Engineering", "Environmental Engineering", "Geosystems Engineering", "Mechanical Engineering", "Petroleum Engineering"],
-  "College of Fine Arts": ["Acting", "Art Education", "Art History", "Arts and Entertainment Technologies", "Dance", "Dance Education", "Design", "Jazz", "Music", "Music Composition", "Music Performance", "Music Studies", "Studio Art", "Theatre & Dance, Dance", "Theatre & Dance, Theatre", "Theatre Education"],
-  "Jackson School of Geosciences": ["Climate System Science", "Environmental Science", "General Geology", "Geophysics", "Geosciences", "Geosciences (Teaching)", "Geosystems Engineering", "Hydrology and Water Resources"],
+  "School of Architecture": [
+    "Architectural Studies",
+    "Architecture",
+    "Architecture/Architectural Engineering",
+    "Interior Design",
+  ],
+  "McCombs School of Business": [
+    "Accounting",
+    "Business Analytics",
+    "Canfield Business Honors Program",
+    "Finance",
+    "International Business",
+    "Management",
+    "Management Information Systems",
+    "Marketing",
+    "Supply Chain Management",
+  ],
+  "School of Civic Leadership": [
+    "Civics Honors",
+    "Great Books Honors",
+    "Strategy and Statecraft",
+  ],
+  "Moody College of Communication": [
+    "Advertising",
+    "Communication and Leadership",
+    "Communication Studies",
+    "Journalism",
+    "Public Relations",
+    "Radio-Television-Film",
+    "Speech, Language, and Hearing Sciences",
+    "Undeclared (Communication)",
+  ],
+  "College of Education": [
+    "Education",
+    "Kinesiology and Health",
+    "Athletic Training",
+  ],
+  "Cockrell School of Engineering": [
+    "Aerospace Engineering",
+    "Architectural Engineering",
+    "Biomedical Engineering",
+    "Chemical Engineering",
+    "Civil Engineering",
+    "Computational Engineering",
+    "Electrical and Computer Engineering",
+    "Environmental Engineering",
+    "Geosystems Engineering",
+    "Mechanical Engineering",
+    "Petroleum Engineering",
+  ],
+  "College of Fine Arts": [
+    "Acting",
+    "Art Education",
+    "Art History",
+    "Arts and Entertainment Technologies",
+    "Dance",
+    "Dance Education",
+    "Design",
+    "Jazz",
+    "Music",
+    "Music Composition",
+    "Music Performance",
+    "Music Studies",
+    "Studio Art",
+    "Theatre & Dance, Dance",
+    "Theatre & Dance, Theatre",
+    "Theatre Education",
+  ],
+  "Jackson School of Geosciences": [
+    "Climate System Science",
+    "Environmental Science",
+    "General Geology",
+    "Geophysics",
+    "Geosciences",
+    "Geosciences (Teaching)",
+    "Geosystems Engineering",
+    "Hydrology and Water Resources",
+  ],
   "School of Information": ["Informatics"],
-  "College of Liberal Arts": ["African and African Diaspora Studies", "American Studies", "Anthropology", "Asian American Studies", "Asian Cultures and Languages", "Asian Studies", "Behavioral and Social Data Science", "Classical Languages", "Classical Studies", "Economics", "English", "Environmental Science", "European Studies", "French Studies", "Geography", "German", "Government", "Health & Society", "History", "Human Dimensions of Organizations", "Humanities", "International Relations and Global Studies", "Italian", "Jewish Studies", "Latin American Studies", "Linguistics", "Mexican American and Latina/o Studies", "Middle Eastern Studies", "Philosophy", "Plan II Honors Program", "Psychology", "Race, Indigeneity, and Migration", "Religious Studies", "Rhetoric and Writing", "Russian, East European and Eurasian Studies", "Sociology", "Spanish", "Sustainability Studies", "Undeclared (Liberal Arts)", "Urban Studies", "Women's and Gender Studies"],
-  "College of Natural Sciences": ["Astronomy", "Biochemistry", "Biology", "Chemistry", "Computer Science", "Environmental Science", "Human Development and Family Sciences", "Human Ecology", "Mathematics", "Medical Laboratory Science", "Neuroscience", "Nutrition", "Physics", "Pre-Pharmacy", "Public Health", "Statistics and Data Science", "Textiles and Apparel", "Undeclared (Natural Sciences)"],
+  "College of Liberal Arts": [
+    "African and African Diaspora Studies",
+    "American Studies",
+    "Anthropology",
+    "Asian American Studies",
+    "Asian Cultures and Languages",
+    "Asian Studies",
+    "Behavioral and Social Data Science",
+    "Classical Languages",
+    "Classical Studies",
+    "Economics",
+    "English",
+    "Environmental Science",
+    "European Studies",
+    "French Studies",
+    "Geography",
+    "German",
+    "Government",
+    "Health & Society",
+    "History",
+    "Human Dimensions of Organizations",
+    "Humanities",
+    "International Relations and Global Studies",
+    "Italian",
+    "Jewish Studies",
+    "Latin American Studies",
+    "Linguistics",
+    "Mexican American and Latina/o Studies",
+    "Middle Eastern Studies",
+    "Philosophy",
+    "Plan II Honors Program",
+    "Psychology",
+    "Race, Indigeneity, and Migration",
+    "Religious Studies",
+    "Rhetoric and Writing",
+    "Russian, East European and Eurasian Studies",
+    "Sociology",
+    "Spanish",
+    "Sustainability Studies",
+    "Undeclared (Liberal Arts)",
+    "Urban Studies",
+    "Women's and Gender Studies",
+  ],
+  "College of Natural Sciences": [
+    "Astronomy",
+    "Biochemistry",
+    "Biology",
+    "Chemistry",
+    "Computer Science",
+    "Environmental Science",
+    "Human Development and Family Sciences",
+    "Human Ecology",
+    "Mathematics",
+    "Medical Laboratory Science",
+    "Neuroscience",
+    "Nutrition",
+    "Physics",
+    "Pre-Pharmacy",
+    "Public Health",
+    "Statistics and Data Science",
+    "Textiles and Apparel",
+    "Undeclared (Natural Sciences)",
+  ],
 };
 
 export default function ProfilePage() {
@@ -190,7 +360,7 @@ export default function ProfilePage() {
       const url = await getDownloadURL(storageRef);
       await updateDoc(doc(getDb(), "users", user.uid), { avatarUrl: url });
       setAvatarUrl(url);
-      setProfile((prev) => prev ? { ...prev, avatarUrl: url } : prev);
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: url } : prev));
     } finally {
       setUploadingPhoto(false);
       // Reset input so the same file can be re-selected
@@ -211,7 +381,21 @@ export default function ProfilePage() {
       goals,
       hobbies,
     });
-    setProfile((prev) => prev ? { ...prev, firstName, lastName, yearClassification, school, major, interests, goals, hobbies } : prev);
+    setProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            firstName,
+            lastName,
+            yearClassification,
+            school,
+            major,
+            interests,
+            goals,
+            hobbies,
+          }
+        : prev,
+    );
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -239,7 +423,9 @@ export default function ProfilePage() {
       <div className="flex min-h-screen bg-gray-50 font-sans">
         <Sidebar user={currentUser} />
         <div className="flex flex-col flex-1 items-center justify-center gap-4">
-          <p className="text-gray-600">No profile found. Complete onboarding first.</p>
+          <p className="text-gray-600">
+            No profile found. Complete onboarding first.
+          </p>
           <button
             onClick={() => router.push("/onboarding")}
             className="rounded-xl bg-blue-900 px-5 py-2 text-white hover:bg-blue-800"
@@ -260,7 +446,9 @@ export default function ProfilePage() {
 
         {/* Personal Information */}
         <section className="mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Personal Information</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Personal Information
+          </h2>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex gap-8 items-start">
               {/* Profile picture */}
@@ -268,7 +456,13 @@ export default function ProfilePage() {
                 <div className="relative">
                   <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 overflow-hidden">
                     {avatarUrl ? (
-                      <Image src={avatarUrl} alt="Profile" width={96} height={96} className="w-full h-full object-cover" />
+                      <Image
+                        src={avatarUrl}
+                        alt="Profile"
+                        width={96}
+                        height={96}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <User className="h-12 w-12" />
                     )}
@@ -297,7 +491,9 @@ export default function ProfilePage() {
               {/* Fields */}
               <div className="grid grid-cols-2 gap-4 flex-1">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">First Name</label>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    First Name
+                  </label>
                   <input
                     type="text"
                     value={firstName}
@@ -306,7 +502,9 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Last Name</label>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    Last Name
+                  </label>
                   <input
                     type="text"
                     value={lastName}
@@ -315,7 +513,9 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Email</label>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    Email
+                  </label>
                   <input
                     type="text"
                     value={user?.email ?? ""}
@@ -324,32 +524,45 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">School</label>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    School
+                  </label>
                   <select
                     value={school}
-                    onChange={(e) => { setSchool(e.target.value); setMajor(""); }}
+                    onChange={(e) => {
+                      setSchool(e.target.value);
+                      setMajor("");
+                    }}
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                   >
                     <option value="">Select school</option>
                     {Object.keys(schoolOptions).map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Student Year</label>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    Student Year
+                  </label>
                   <select
                     value={yearClassification}
                     onChange={(e) => setYearClassification(e.target.value)}
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                   >
                     {YEAR_OPTIONS.map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Major</label>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    Major
+                  </label>
                   <select
                     value={major}
                     onChange={(e) => setMajor(e.target.value)}
@@ -358,7 +571,9 @@ export default function ProfilePage() {
                   >
                     <option value="">Select major</option>
                     {availableMajors.map((m) => (
-                      <option key={m} value={m}>{m}</option>
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
                     ))}
                     {major && !availableMajors.includes(major) && (
                       <option value={major}>{major}</option>
@@ -375,7 +590,9 @@ export default function ProfilePage() {
           <h2 className="text-xl font-bold text-gray-900 mb-4">Preferences</h2>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-6">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Academic Interests</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                Academic Interests
+              </h3>
               <div className="flex flex-wrap gap-2">
                 {INTEREST_OPTIONS.map((item) => {
                   const selected = interests.includes(item);
@@ -383,7 +600,13 @@ export default function ProfilePage() {
                     <button
                       key={item}
                       type="button"
-                      onClick={() => setInterests((prev) => selected ? prev.filter((i) => i !== item) : [...prev, item])}
+                      onClick={() =>
+                        setInterests((prev) =>
+                          selected
+                            ? prev.filter((i) => i !== item)
+                            : [...prev, item],
+                        )
+                      }
                       className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
                         selected
                           ? "bg-blue-900 text-white border-blue-900"
@@ -398,7 +621,9 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Pre-Professional Aspirations</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                Pre-Professional Aspirations
+              </h3>
               <div className="flex flex-wrap gap-2">
                 {GOAL_OPTIONS.map((item) => {
                   const selected = goals.includes(item);
@@ -406,7 +631,13 @@ export default function ProfilePage() {
                     <button
                       key={item}
                       type="button"
-                      onClick={() => setGoals((prev) => selected ? prev.filter((g) => g !== item) : [...prev, item])}
+                      onClick={() =>
+                        setGoals((prev) =>
+                          selected
+                            ? prev.filter((g) => g !== item)
+                            : [...prev, item],
+                        )
+                      }
                       className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
                         selected
                           ? "bg-blue-900 text-white border-blue-900"
@@ -421,7 +652,9 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Hobbies</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                Hobbies
+              </h3>
               <div className="flex flex-wrap gap-2">
                 {HOBBY_OPTIONS.map((item) => {
                   const selected = hobbies.includes(item);
@@ -429,7 +662,13 @@ export default function ProfilePage() {
                     <button
                       key={item}
                       type="button"
-                      onClick={() => setHobbies((prev) => selected ? prev.filter((h) => h !== item) : [...prev, item])}
+                      onClick={() =>
+                        setHobbies((prev) =>
+                          selected
+                            ? prev.filter((h) => h !== item)
+                            : [...prev, item],
+                        )
+                      }
                       className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
                         selected
                           ? "bg-blue-900 text-white border-blue-900"

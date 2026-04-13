@@ -3,10 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight, Check, Compass, Fish, Bubbles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Compass,
+  Fish,
+  Bubbles,
+} from "lucide-react";
 import { doc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
-
 
 type OnboardingFormData = {
   firstName: string;
@@ -18,7 +24,6 @@ type OnboardingFormData = {
   goals: string[];
   hobbies: string[];
 };
-
 
 type Step = {
   id: string;
@@ -67,146 +72,159 @@ const initialFormData: OnboardingFormData = {
   firstName: "",
   lastName: "",
   yearClassification: "",
-  school: "", 
+  school: "",
   major: "",
   interests: [],
   goals: [],
   hobbies: [],
 };
 
-
-const yearClassificationOptions = [
-  "Freshman",
-  "Sophomore",
-  "Junior",
-  "Senior",
-];
+const yearClassificationOptions = ["Freshman", "Sophomore", "Junior", "Senior"];
 
 const schoolOptions: Record<string, string[]> = {
-    "School of Architecture": ["Architectural Studies", 
-        "Architecture", 
-        "Architecture/Architectural Engineering", 
-        "Interior Design"],
-    "McCombs School of Business": ["Accounting",
-        "Business Analytics", 
-        "Canfield Business Honors Program",
-        "Finance",
-        "International Business",
-        "Management",
-        "Management Information Systems",
-        "Marketing",
-        "Supply Chain Management"],
-    "School of Civic Leadership": ["Civics Honors",
-        "Great Books Honors",
-        "Strategy and Statecraft"],
-    "Moody College of Communication": ["Advertising",
-        "Communication and Leadership",
-        "Communication Studies",
-        "Journalism",
-        "Public Relations",
-        "Radio-Television-Film",
-        "Speech, Language, and Hearing Sciences",
-        "Undeclared (Communication)"],
-    "College of Education": ["Education",
-        "Kinesiology and Health",
-        "Athletic Training"],
-    "Cockrell School of Engineering": ["Aerospace Engineering",
-        "Architectural Engineering",
-        "Biomedical Engineering",
-        "Chemical Engineering",
-        "Civil Engineering",
-        "Computational Engineering",
-        "Electrical and Computer Engineering",
-        "Environmental Engineering",
-        "Geosystems Engineering",
-        "Mechanical Engineering",
-        "Petroleum Engineering"],
-    "College of Fine Arts": ["Acting",
-        "Art Education",
-        "Art History",
-        "Arts and Entertainment Technologies",
-        "Dance",
-        "Dance Education",
-        "Design",
-        "Jazz",
-        "Music",
-        "Music Composition",
-        "Music Performance",
-        "Music Studies",
-        "Studio Art",
-        "Theatre & Dance, Dance",
-        "Theatre & Dance, Theatre",
-        "Theatre Education"],
-    "Jackson School of Geosciences": ["Climate System Science",
-        "Environmental Science",
-        "General Geology",
-        "Geophysics",
-        "Geosciences",
-        "Geosciences (Teaching)",
-        "Geosystems Engineering",
-        "Hydrology and Water Resources"],
-    "School of Information": ["Informatics"],
-    "College of Liberal Arts": ["African and African Diaspora Studies",
-        "American Studies",
-        "Anthropology",
-        "Asian American Studies",
-        "Asian Cultures and Languages",
-        "Asian Studies",
-        "Behavioral and Social Data Science",
-        "Classical Languages",
-        "Classical Studies",
-        "Economics",
-        "English",
-        "Environmental Science",
-        "European Studies",
-        "French Studies",
-        "Geography",
-        "German",
-        "Government",
-        "Health & Society",
-        "History",
-        "Human Dimensions of Organizations",
-        "Humanities",
-        "International Relations and Global Studies",
-        "Italian",
-        "Jewish Studies",
-        "Latin American Studies",
-        "Linguistics",
-        "Mexican American and Latina/o Studies",
-        "Middle Eastern Studies",
-        "Philosophy",
-        "Plan II Honors Program",
-        "Psychology",
-        "Race, Indigeneity, and Migration",
-        "Religious Studies",
-        "Rhetoric and Writing",
-        "Russian, East European and Eurasian Studies",
-        "Sociology",
-        "Spanish",
-        "Sustainability Studies",
-        "Undeclared (Liberal Arts)",
-        "Urban Studies",
-        "Women’s and Gender Studies"],
-    "College of Natural Sciences": ["Astronomy",
-        "Biochemistry",
-        "Biology",
-        "Chemistry",
-        "Computer Science",
-        "Environmental Science",
-        "Human Development and Family Sciences",
-        "Human Ecology",
-        "Mathematics",
-        "Medical Laboratory Science",
-        "Neuroscience",
-        "Nutrition",
-        "Physics",
-        "Pre-Pharmacy",
-        "Public Health",
-        "Statistics and Data Science",
-        "Textiles and Apparel",
-        "Undeclared (Natural Sciences)"]
+  "School of Architecture": [
+    "Architectural Studies",
+    "Architecture",
+    "Architecture/Architectural Engineering",
+    "Interior Design",
+  ],
+  "McCombs School of Business": [
+    "Accounting",
+    "Business Analytics",
+    "Canfield Business Honors Program",
+    "Finance",
+    "International Business",
+    "Management",
+    "Management Information Systems",
+    "Marketing",
+    "Supply Chain Management",
+  ],
+  "School of Civic Leadership": [
+    "Civics Honors",
+    "Great Books Honors",
+    "Strategy and Statecraft",
+  ],
+  "Moody College of Communication": [
+    "Advertising",
+    "Communication and Leadership",
+    "Communication Studies",
+    "Journalism",
+    "Public Relations",
+    "Radio-Television-Film",
+    "Speech, Language, and Hearing Sciences",
+    "Undeclared (Communication)",
+  ],
+  "College of Education": [
+    "Education",
+    "Kinesiology and Health",
+    "Athletic Training",
+  ],
+  "Cockrell School of Engineering": [
+    "Aerospace Engineering",
+    "Architectural Engineering",
+    "Biomedical Engineering",
+    "Chemical Engineering",
+    "Civil Engineering",
+    "Computational Engineering",
+    "Electrical and Computer Engineering",
+    "Environmental Engineering",
+    "Geosystems Engineering",
+    "Mechanical Engineering",
+    "Petroleum Engineering",
+  ],
+  "College of Fine Arts": [
+    "Acting",
+    "Art Education",
+    "Art History",
+    "Arts and Entertainment Technologies",
+    "Dance",
+    "Dance Education",
+    "Design",
+    "Jazz",
+    "Music",
+    "Music Composition",
+    "Music Performance",
+    "Music Studies",
+    "Studio Art",
+    "Theatre & Dance, Dance",
+    "Theatre & Dance, Theatre",
+    "Theatre Education",
+  ],
+  "Jackson School of Geosciences": [
+    "Climate System Science",
+    "Environmental Science",
+    "General Geology",
+    "Geophysics",
+    "Geosciences",
+    "Geosciences (Teaching)",
+    "Geosystems Engineering",
+    "Hydrology and Water Resources",
+  ],
+  "School of Information": ["Informatics"],
+  "College of Liberal Arts": [
+    "African and African Diaspora Studies",
+    "American Studies",
+    "Anthropology",
+    "Asian American Studies",
+    "Asian Cultures and Languages",
+    "Asian Studies",
+    "Behavioral and Social Data Science",
+    "Classical Languages",
+    "Classical Studies",
+    "Economics",
+    "English",
+    "Environmental Science",
+    "European Studies",
+    "French Studies",
+    "Geography",
+    "German",
+    "Government",
+    "Health & Society",
+    "History",
+    "Human Dimensions of Organizations",
+    "Humanities",
+    "International Relations and Global Studies",
+    "Italian",
+    "Jewish Studies",
+    "Latin American Studies",
+    "Linguistics",
+    "Mexican American and Latina/o Studies",
+    "Middle Eastern Studies",
+    "Philosophy",
+    "Plan II Honors Program",
+    "Psychology",
+    "Race, Indigeneity, and Migration",
+    "Religious Studies",
+    "Rhetoric and Writing",
+    "Russian, East European and Eurasian Studies",
+    "Sociology",
+    "Spanish",
+    "Sustainability Studies",
+    "Undeclared (Liberal Arts)",
+    "Urban Studies",
+    "Women’s and Gender Studies",
+  ],
+  "College of Natural Sciences": [
+    "Astronomy",
+    "Biochemistry",
+    "Biology",
+    "Chemistry",
+    "Computer Science",
+    "Environmental Science",
+    "Human Development and Family Sciences",
+    "Human Ecology",
+    "Mathematics",
+    "Medical Laboratory Science",
+    "Neuroscience",
+    "Nutrition",
+    "Physics",
+    "Pre-Pharmacy",
+    "Public Health",
+    "Statistics and Data Science",
+    "Textiles and Apparel",
+    "Undeclared (Natural Sciences)",
+  ],
 };
-
 
 const academicInterestOptions = [
   "Mechanical Engineering",
@@ -222,7 +240,7 @@ const academicInterestOptions = [
   "Fine Arts",
   "Communications",
   "Mathematics",
-  "Product Management"
+  "Product Management",
 ];
 
 const careerGoalOptions = [
@@ -251,28 +269,25 @@ const hobbyOptions = [
   "Running",
 ];
 
-const isStepValid = (stepIndex: number, formData: OnboardingFormData): boolean => {
+const isStepValid = (
+  stepIndex: number,
+  formData: OnboardingFormData,
+): boolean => {
   switch (stepIndex) {
     case 0:
       return Boolean(
         formData.firstName.trim() &&
-          formData.lastName.trim() &&
-          formData.yearClassification &&
-          formData.school &&
-          formData.major,
+        formData.lastName.trim() &&
+        formData.yearClassification &&
+        formData.school &&
+        formData.major,
       );
     case 1:
-      return Boolean(
-        formData.interests.length > 0,
-      );
+      return Boolean(formData.interests.length > 0);
     case 2:
-      return Boolean(
-        formData.goals.length > 0,
-      );
+      return Boolean(formData.goals.length > 0);
     case 3:
-      return Boolean(
-        formData.hobbies.length > 0,
-      );
+      return Boolean(formData.hobbies.length > 0);
     case 4:
       return true;
     default:
@@ -347,7 +362,7 @@ export default function OnboardingPage() {
       };
     });
   };
-  
+
   const toggleGoal = (goal: string) => {
     setFormData((previousData) => {
       const hasGoal = previousData.goals.includes(goal);
@@ -412,7 +427,10 @@ export default function OnboardingPage() {
 
     await setDoc(doc(db, "users", uid), payload);
 
-    window.localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(
+      SUBMISSION_STORAGE_KEY,
+      JSON.stringify(payload),
+    );
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     setSubmitted(true);
   };
@@ -457,7 +475,7 @@ export default function OnboardingPage() {
   }
 
   return (
-   <main className="min-h-screen bg-[#f4f4f6] lg:grid lg:grid-cols-2">
+    <main className="min-h-screen bg-[#f4f4f6] lg:grid lg:grid-cols-2">
       <section className="hidden relative bg-blue-900 p-10 lg:flex lg:flex-col overflow-hidden">
         <Image
           src="/onboarding.png"
@@ -597,7 +615,9 @@ export default function OnboardingPage() {
                   </span>
                   <select
                     value={formData.major}
-                    onChange={(event) => updateField("major", event.target.value)}
+                    onChange={(event) =>
+                      updateField("major", event.target.value)
+                    }
                     disabled={!formData.school}
                     className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none transition focus:border-blue-700 disabled:bg-gray-100"
                   >
@@ -615,85 +635,87 @@ export default function OnboardingPage() {
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div className="grid gap-3 sm:grid-cols-2">
-                    {academicInterestOptions.map((option) => {
-                      const checked = formData.interests.includes(option);
-                      return (
-                        <label
-                          key={option}
-                          className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
-                            checked
-                              ? "border-blue-700 bg-blue-50"
-                              : "border-gray-300 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleInterest(option)}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-700"
-                          />
-                          <span className="text-sm text-gray-800">{option}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {academicInterestOptions.map((option) => {
+                    const checked = formData.interests.includes(option);
+                    return (
+                      <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                          checked
+                            ? "border-blue-700 bg-blue-50"
+                            : "border-gray-300 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleInterest(option)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-700"
+                        />
+                        <span className="text-sm text-gray-800">{option}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
             {currentStep === 2 && (
               <div className="space-y-6">
-                  <div className="space-y-2">
-                    {careerGoalOptions.map((option) => {
-                      const checked = formData.goals.includes(option);
-                      return (
-                        <label
-                          key={option}
-                          className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
-                            checked
-                              ? "border-blue-700 bg-blue-50"
-                              : "border-gray-300 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleGoal(option)}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-700"
-                          />
-                          <span className="text-sm text-gray-800">{option}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                <div className="space-y-2">
+                  {careerGoalOptions.map((option) => {
+                    const checked = formData.goals.includes(option);
+                    return (
+                      <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                          checked
+                            ? "border-blue-700 bg-blue-50"
+                            : "border-gray-300 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleGoal(option)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-700"
+                        />
+                        <span className="text-sm text-gray-800">{option}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
             {currentStep === 3 && (
               <div className="space-y-6">
-                <p className="text-sm font-medium text-gray-500 mb2">Add current organizations functionality</p>
-                  <div className="space-y-2">
-                    {hobbyOptions.map((option) => {
-                      const checked = formData.hobbies.includes(option);
-                      return (
-                        <label
-                          key={option}
-                          className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
-                            checked
-                              ? "border-blue-700 bg-blue-50"
-                              : "border-gray-300 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleHobby(option)}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-700"
-                          />
-                          <span className="text-sm text-gray-800">{option}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                <p className="text-sm font-medium text-gray-500 mb2">
+                  Add current organizations functionality
+                </p>
+                <div className="space-y-2">
+                  {hobbyOptions.map((option) => {
+                    const checked = formData.hobbies.includes(option);
+                    return (
+                      <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                          checked
+                            ? "border-blue-700 bg-blue-50"
+                            : "border-gray-300 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleHobby(option)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-700"
+                        />
+                        <span className="text-sm text-gray-800">{option}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

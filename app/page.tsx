@@ -42,7 +42,11 @@ export default function AuthenticationPage() {
         await signInWithEmailAndPassword(auth, email, password);
         router.push("/home");
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
         if (auth.currentUser && name) {
           await updateProfile(auth.currentUser, { displayName: name });
         }
@@ -84,7 +88,6 @@ export default function AuthenticationPage() {
         priority
       />
       <div className="relative z-10 w-full max-w-md bg-white rounded-lg shadow-lg p-8">
-
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             {isLogin ? "Welcome Back" : "Create Account"}
@@ -95,7 +98,6 @@ export default function AuthenticationPage() {
           </p>
         </div>
 
-
         <div className="mb-4 bg-black text-white rounded-lg">
           <button
             type="button"
@@ -103,18 +105,34 @@ export default function AuthenticationPage() {
             disabled={loading}
             className="w-full inline-flex items-center justify-center gap-2 border border-gray-300 py-2 rounded-lg hover:bg-orange-700 disabled:opacity-50"
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-              <path fill="#EA4335" d="M23.64 12.205c0-.78-.07-1.53-.2-2.255H12v4.268h6.36c-.275 1.48-1.14 2.73-2.43 3.57v2.975h3.93c2.29-2.11 3.6-5.22 3.6-8.558z" />
-              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.93-2.91l-3.93-2.975c-1.09.73-2.5 1.16-4 1.16-3.08 0-5.69-2.08-6.62-4.88H1.29v3.06C3.26 21.9 7.31 24 12 24z" />
-              <path fill="#4A90E2" d="M5.38 14.39a7.43 7.43 0 010-4.78V6.55H1.29a12 12 0 000 10.9l4.09-3.06z" />
-              <path fill="#FBBC05" d="M12 4.8c1.75 0 3.33.6 4.57 1.77l3.43-3.43C17.94 1.24 15.24 0 12 0 7.31 0 3.26 2.1 1.29 5.55l4.09 3.06C6.31 6.88 8.92 4.8 12 4.8z" />
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden
+            >
+              <path
+                fill="#EA4335"
+                d="M23.64 12.205c0-.78-.07-1.53-.2-2.255H12v4.268h6.36c-.275 1.48-1.14 2.73-2.43 3.57v2.975h3.93c2.29-2.11 3.6-5.22 3.6-8.558z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 24c3.24 0 5.95-1.07 7.93-2.91l-3.93-2.975c-1.09.73-2.5 1.16-4 1.16-3.08 0-5.69-2.08-6.62-4.88H1.29v3.06C3.26 21.9 7.31 24 12 24z"
+              />
+              <path
+                fill="#4A90E2"
+                d="M5.38 14.39a7.43 7.43 0 010-4.78V6.55H1.29a12 12 0 000 10.9l4.09-3.06z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M12 4.8c1.75 0 3.33.6 4.57 1.77l3.43-3.43C17.94 1.24 15.24 0 12 0 7.31 0 3.26 2.1 1.29 5.55l4.09 3.06C6.31 6.88 8.92 4.8 12 4.8z"
+              />
             </svg>
             Continue with Google
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-
           {!isLogin && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -136,7 +154,6 @@ export default function AuthenticationPage() {
             </div>
           )}
 
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email
@@ -155,7 +172,6 @@ export default function AuthenticationPage() {
               />
             </div>
           </div>
-
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -176,13 +192,11 @@ export default function AuthenticationPage() {
             </div>
           </div>
 
-
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
               {error}
             </div>
           )}
-
 
           <button
             type="submit"
@@ -192,7 +206,6 @@ export default function AuthenticationPage() {
             {loading ? "Loading..." : isLogin ? "Log In" : "Create Account"}
           </button>
         </form>
-
 
         <div className="mt-6 pt-6 border-t border-gray-200 text-center">
           <p className="text-gray-600 text-sm">

@@ -3,11 +3,29 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { doc, getDoc, setDoc, arrayRemove, updateDoc, deleteField } from "firebase/firestore";
-import { Calendar, MapPin, House, Fish, Settings, User, Search } from "lucide-react";
-import Image from "next/image"
+import {
+  doc,
+  getDoc,
+  setDoc,
+  arrayRemove,
+  updateDoc,
+  deleteField,
+} from "firebase/firestore";
+import {
+  Calendar,
+  MapPin,
+  House,
+  Fish,
+  Settings,
+  User,
+  Search,
+} from "lucide-react";
+import Image from "next/image";
 import { getDb } from "@/lib/firebase";
-import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
+import {
+  addToGoogleCalendar,
+  deleteFromGoogleCalendar,
+} from "@/lib/googleCalendar";
 import { getCategoryStyle } from "@/lib/categories";
 
 interface EventCard {
@@ -81,7 +99,9 @@ function mapDBEventToCard(event: DBEvent): EventCard {
   const primaryCategory =
     event.tags?.primary_category ??
     (event.weights?.categories
-      ? Object.entries(event.weights.categories).sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0]
+      ? Object.entries(event.weights.categories).sort(
+          ([, a], [, b]) => (b as number) - (a as number),
+        )[0]?.[0]
       : undefined) ??
     "other";
 
@@ -109,14 +129,19 @@ function Sidebar({ user }: { user: User }) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: House, route: "/home" },
     { id: "saved", label: "Your Saved", icon: Fish, route: "/saved" },
-    { id: "settings", label: "Settings", icon: Settings, route: "/profile"},
+    { id: "settings", label: "Settings", icon: Settings, route: "/profile" },
   ];
 
   return (
     <aside className="relative z-10 w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4">
       <div className="flex items-center gap-2 mb-10 px-2 text-blue-900">
         <div className="relative h-10 w-10 overflow-hidden">
-          <Image src="/ut-compass.svg" alt="UT Compass logo" fill className="object-cover scale-120 origin-center" />
+          <Image
+            src="/ut-compass.svg"
+            alt="UT Compass logo"
+            fill
+            className="object-cover scale-120 origin-center"
+          />
         </div>
         <span className="text-xl font-more-sugar font-bold">UT Compass</span>
       </div>
@@ -144,7 +169,9 @@ function Sidebar({ user }: { user: User }) {
             <User className="h-6 w-6"></User>
           </div>
           <div className="overflow-hidden">
-            <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {user.name}
+            </p>
             <p className="text-xs text-gray-400 truncate">{user.email}</p>
           </div>
         </div>
@@ -174,9 +201,13 @@ function SavedEventCard({
 }: {
   card: EventCard;
   onUnsave: (id: string) => void;
-  onAddToGCal: (card: EventCard) => Promise<{ success: boolean; error?: string }>;
+  onAddToGCal: (
+    card: EventCard,
+  ) => Promise<{ success: boolean; error?: string }>;
 }) {
-  const [gcalStatus, setGcalStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [gcalStatus, setGcalStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
   const [expanded, setExpanded] = useState(false);
   const [isClamped, setIsClamped] = useState(false);
   const descRef = useRef<HTMLDivElement | HTMLParagraphElement>(null);
@@ -212,7 +243,10 @@ function SavedEventCard({
             {card.tags.map((key) => {
               const cat = getCategoryStyle(key);
               return (
-                <span key={key} className={`text-xs font-medium px-2.5 py-1 rounded-full ${cat.bg} ${cat.text}`}>
+                <span
+                  key={key}
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${cat.bg} ${cat.text}`}
+                >
                   {cat.label}
                 </span>
               );
@@ -227,12 +261,14 @@ function SavedEventCard({
           </button>
         </div>
 
-        <h3 className="font-bold text-gray-900 text-base leading-snug">{card.title}</h3>
+        <h3 className="font-bold text-gray-900 text-base leading-snug">
+          {card.title}
+        </h3>
 
         <div className="flex flex-col gap-1 text-xs text-blue-600">
           <span className="flex items-center gap-1">
-              <Calendar className="h-4 w-4"></Calendar>
-              {card.date}
+            <Calendar className="h-4 w-4"></Calendar>
+            {card.date}
           </span>
           <span className="flex items-center gap-1">
             <MapPin className="h-4 w-4"></MapPin>
@@ -316,11 +352,13 @@ function GCalUnsaveModal({
         </h2>
         <p className="text-sm text-gray-500 mb-4">
           You added{" "}
-          <span className="font-medium text-gray-700">{card.title}</span>{" "}
-          to Google Calendar. Would you like to remove it too?
+          <span className="font-medium text-gray-700">{card.title}</span> to
+          Google Calendar. Would you like to remove it too?
         </p>
         {state === "error" && (
-          <p className="text-xs text-red-500 mb-3">Something went wrong. Please try again.</p>
+          <p className="text-xs text-red-500 mb-3">
+            Something went wrong. Please try again.
+          </p>
         )}
         <div className="flex flex-col gap-2">
           <button
@@ -373,7 +411,9 @@ export default function Page() {
     fetch("/api/events")
       .then((res) => res.json())
       .then((data: DBEvent[]) => {
-        setAllEvents(data.filter((e) => e.content?.startTime).map(mapDBEventToCard));
+        setAllEvents(
+          data.filter((e) => e.content?.startTime).map(mapDBEventToCard),
+        );
       })
       .finally(() => setLoading(false));
   }, []);
@@ -390,9 +430,15 @@ export default function Page() {
       setGcalEventIds((prev) => ({ ...prev, [card.id]: result.gcalEventId! }));
       const userRef = doc(getDb(), "users", user.uid);
       try {
-        await updateDoc(userRef, { [`gcalEventIds.${card.id}`]: result.gcalEventId });
+        await updateDoc(userRef, {
+          [`gcalEventIds.${card.id}`]: result.gcalEventId,
+        });
       } catch {
-        await setDoc(userRef, { gcalEventIds: { [card.id]: result.gcalEventId } }, { merge: true });
+        await setDoc(
+          userRef,
+          { gcalEventIds: { [card.id]: result.gcalEventId } },
+          { merge: true },
+        );
       }
     }
     return result;
@@ -406,16 +452,24 @@ export default function Page() {
       return next;
     });
     const userRef = doc(getDb(), "users", user.uid);
-    await setDoc(userRef, { savedEventIds: arrayRemove(eventId) }, { merge: true });
+    await setDoc(
+      userRef,
+      { savedEventIds: arrayRemove(eventId) },
+      { merge: true },
+    );
   }
 
-  async function handleUnsaveWithGCal(eventId: string, deleteFromGCal: boolean) {
+  async function handleUnsaveWithGCal(
+    eventId: string,
+    deleteFromGCal: boolean,
+  ) {
     if (!user?.uid) return;
     if (deleteFromGCal) {
       const gcalEventId = gcalEventIds[eventId];
       if (gcalEventId) {
         const result = await deleteFromGoogleCalendar(gcalEventId);
-        if (!result.success && result.error !== "cancelled") throw new Error(result.error);
+        if (!result.success && result.error !== "cancelled")
+          throw new Error(result.error);
       }
       setGcalEventIds((prev) => {
         const next = { ...prev };
@@ -431,7 +485,10 @@ export default function Page() {
   function handleUnsaveClick(eventId: string) {
     if (gcalEventIds[eventId]) {
       const card = savedEvents.find((e) => e.id === eventId);
-      if (card) { setUnsavePending(card); return; }
+      if (card) {
+        setUnsavePending(card);
+        return;
+      }
     }
     handleUnsave(eventId);
   }
@@ -439,11 +496,14 @@ export default function Page() {
   const query = searchQuery.toLowerCase().trim();
   const savedEvents = allEvents
     .filter((e) => savedIds.has(e.id))
-    .filter((e) =>
-      !query ||
-      e.title.toLowerCase().includes(query) ||
-      e.location.toLowerCase().includes(query) ||
-      e.tags.some((t) => getCategoryStyle(t).label.toLowerCase().includes(query))
+    .filter(
+      (e) =>
+        !query ||
+        e.title.toLowerCase().includes(query) ||
+        e.location.toLowerCase().includes(query) ||
+        e.tags.some((t) =>
+          getCategoryStyle(t).label.toLowerCase().includes(query),
+        ),
     );
 
   return (
@@ -459,7 +519,9 @@ export default function Page() {
 
       <div className="relative z-10 flex flex-col flex-1 min-w-0">
         <header className="flex items-center gap-4 px-8 py-5 bg-white border-b border-gray-100">
-          <h1 className="text-2xl font-bold text-blue-900 shrink-0">Your Saved Events</h1>
+          <h1 className="text-2xl font-bold text-blue-900 shrink-0">
+            Your Saved Events
+          </h1>
           <div className="relative ml-auto w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             <input
@@ -480,10 +542,14 @@ export default function Page() {
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Fish className="h-6 w-6 text-[#1a3a5c] mb-3" />
               {query ? (
-                <p className="text-blue-900 text-base">No saved events match &ldquo;{searchQuery}&rdquo;.</p>
+                <p className="text-blue-900 text-base">
+                  No saved events match &ldquo;{searchQuery}&rdquo;.
+                </p>
               ) : (
                 <>
-                  <p className="text-blue-900 text-base">No saved events yet.</p>
+                  <p className="text-blue-900 text-base">
+                    No saved events yet.
+                  </p>
                   <p className="text-blue-900 text-sm mt-1">
                     Bookmark events from the dashboard to see them here.
                   </p>
@@ -494,7 +560,12 @@ export default function Page() {
           {!loading && savedEvents.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {savedEvents.map((card) => (
-                <SavedEventCard key={card.id} card={card} onUnsave={handleUnsaveClick} onAddToGCal={handleAddToGCal} />
+                <SavedEventCard
+                  key={card.id}
+                  card={card}
+                  onUnsave={handleUnsaveClick}
+                  onAddToGCal={handleAddToGCal}
+                />
               ))}
             </div>
           )}
@@ -504,8 +575,12 @@ export default function Page() {
       {unsavePending && (
         <GCalUnsaveModal
           card={unsavePending}
-          onUnsaveOnly={async () => { await handleUnsave(unsavePending.id); }}
-          onUnsaveAndDelete={async () => { await handleUnsaveWithGCal(unsavePending.id, true); }}
+          onUnsaveOnly={async () => {
+            await handleUnsave(unsavePending.id);
+          }}
+          onUnsaveAndDelete={async () => {
+            await handleUnsaveWithGCal(unsavePending.id, true);
+          }}
           onDismiss={() => setUnsavePending(null)}
         />
       )}
