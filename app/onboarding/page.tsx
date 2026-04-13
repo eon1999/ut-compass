@@ -412,12 +412,15 @@ export default function OnboardingPage() {
   };
 
   const handleSubmit = async () => {
+    console.log("[handleSubmit] called", { currentStep, stepsLastIdx: steps.length - 1, canContinue, uid: user?.uid });
     if (currentStep !== steps.length - 1 || !canContinue) {
+      console.log("[handleSubmit] bailed: step/canContinue check");
       return;
     }
 
     const uid = user?.uid;
     if (!uid) {
+      console.log("[handleSubmit] bailed: no uid, user =", user);
       setSubmitted(false);
       return;
     }
@@ -427,7 +430,14 @@ export default function OnboardingPage() {
       submittedAt: new Date().toISOString(),
     };
 
-    await setDoc(doc(getDb(), "users", uid), payload);
+    console.log("[handleSubmit] writing to Firestore...");
+    try {
+      await setDoc(doc(getDb(), "users", uid), payload);
+      console.log("[handleSubmit] Firestore write succeeded");
+    } catch (err) {
+      console.error("[handleSubmit] Firestore write failed", err);
+      return;
+    }
 
     window.localStorage.setItem(
       SUBMISSION_STORAGE_KEY,
