@@ -74,11 +74,14 @@ interface FirestoreTimestamp {
 
 interface DBEvent {
   id: string;
-  src: string;
+  src?: string;
   source?: "hornslink" | "instagram" | "manual";
   scraped_at?: string;
   organization?: { name: string; id: string };
-  content: {
+  instagramHandle?: string;
+  organizationId?: string | null;
+  // HornsLink events use content; Instagram events use extractedDetails
+  content?: {
     title: string;
     descriptionText: string;
     descriptionHtml?: string;
@@ -87,7 +90,14 @@ interface DBEvent {
     startTime: string | FirestoreTimestamp;
     endTime?: string | FirestoreTimestamp;
   };
-  tags: {
+  extractedDetails?: {
+    title: string | null;
+    date: string | null;
+    time: string | null;
+    location: string | null;
+    description: string | null;
+  };
+  tags?: {
     primary_category: string;
     confidence_score: number;
     all_scores: Record<string, number>;
@@ -97,7 +107,7 @@ interface DBEvent {
     categories?: Record<string, number>;
     majors?: Record<string, number>;
   };
-  manual_override: {
+  manual_override?: {
     is_forced: boolean;
     forced_category: string | null;
   };
@@ -459,14 +469,37 @@ function parseStartTime(start_time: string | FirestoreTimestamp): Date {
 }
 
 function mapDBEventToCard(event: DBEvent): EventCard {
-  const date = parseStartTime(event.content.startTime);
-  const formattedDate = date.toLocaleString("en-US", {
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  let startTime: Date;
+  let formattedDate: string;
+  let endTime: Date | undefined;
+
+  if (event.content?.startTime) {
+    startTime = parseStartTime(event.content.startTime);
+    formattedDate = startTime.toLocaleString("en-US", {
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    endTime = event.content.endTime
+      ? parseStartTime(event.content.endTime)
+      : undefined;
+  } else {
+    // Instagram event: date extracted as freeform strings by the ML model
+    const rawDateStr = [
+      event.extractedDetails?.date,
+      event.extractedDetails?.time,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const parsed = rawDateStr ? new Date(rawDateStr) : null;
+    // Use far-future sentinel if unparseable so the event still shows
+    startTime =
+      parsed && !isNaN(parsed.getTime()) ? parsed : new Date(8640000000000000);
+    formattedDate = rawDateStr || "Date TBD";
+    endTime = undefined;
+  }
 
   const primaryCategory =
     event.tags?.primary_category ??
@@ -477,20 +510,29 @@ function mapDBEventToCard(event: DBEvent): EventCard {
       : undefined) ??
     "other";
 
-  const endTime = event.content.endTime
-    ? parseStartTime(event.content.endTime)
-    : undefined;
-
   return {
     id: event.id,
-    title: event.content.title,
-    organization: event.organization?.name ?? event.content.org_name ?? "",
+    title:
+      event.content?.title ??
+      event.extractedDetails?.title ??
+      "Untitled",
+    organization:
+      event.organization?.name ??
+      event.content?.org_name ??
+      event.instagramHandle ??
+      "",
     date: formattedDate,
-    startTime: date,
+    startTime,
     endTime,
-    location: event.content.location,
-    description: event.content.descriptionText,
-    descriptionHtml: event.content.descriptionHtml,
+    location:
+      event.content?.location ??
+      event.extractedDetails?.location ??
+      "",
+    description:
+      event.content?.descriptionText ??
+      event.extractedDetails?.description ??
+      "",
+    descriptionHtml: event.content?.descriptionHtml,
     tags: [primaryCategory],
     source: event.source,
     weights: event.weights,
@@ -740,9 +782,39 @@ function useEvents() {
         const res = await fetch("/api/events");
         if (!res.ok) throw new Error("Failed to fetch events");
         const data: DBEvent[] = await res.json();
-        setCards(
-          data.filter((e) => e.content?.startTime).map(mapDBEventToCard),
-        );
+
+        // #region agent log
+        const sourceCounts: Record<string, number> = {};
+        data.forEach((e) => { const s = e.source ?? "unknown"; sourceCounts[s] = (sourceCounts[s] ?? 0) + 1; });
+        console.log('[DBG 42a428][post-fix] sourceCounts:', JSON.stringify(sourceCounts), 'total:', data.length);
+        // #endregion
+
+        const kept = data.filter((e) => e.content?.startTime || e.source === "instagram");
+        const dropped = data.filter((e) => !e.content?.startTime && e.source !== "instagram");
+
+        // #region agent log
+        const droppedSources: Record<string, number> = {};
+        dropped.forEach((e) => { const s = e.source ?? "unknown"; droppedSources[s] = (droppedSources[s] ?? 0) + 1; });
+        const keptSources: Record<string, number> = {};
+        kept.forEach((e) => { const s = e.source ?? "unknown"; keptSources[s] = (keptSources[s] ?? 0) + 1; });
+        console.log('[DBG 42a428][post-fix] droppedSources:', JSON.stringify(droppedSources), '| keptSources:', JSON.stringify(keptSources));
+        // #endregion
+
+        let mapped: EventCard[] = [];
+        const mapErrors: string[] = [];
+        for (const e of kept) {
+          try {
+            mapped.push(mapDBEventToCard(e));
+          } catch (mapErr) {
+            mapErrors.push(`${e.id}(${e.source}): ${(mapErr as Error).message}`);
+          }
+        }
+
+        // #region agent log
+        console.log('[DBG 42a428][post-fix] mapped:', mapped.length, 'errors:', mapErrors.length, JSON.stringify(mapErrors.slice(0, 5)));
+        // #endregion
+
+        setCards(mapped);
       } catch (err) {
         setError((err as Error).message);
       } finally {
