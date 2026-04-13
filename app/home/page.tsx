@@ -972,7 +972,7 @@ export default function Page() {
 
         <Header
           name={currentUser.name.split(" ")[0]}
-          savedCount={savedIds.size}
+          savedCount={savedCards.length}
         />
 
         <SearchAndFilters
