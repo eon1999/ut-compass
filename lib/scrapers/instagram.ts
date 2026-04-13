@@ -3,7 +3,7 @@
 // proxy-agent transitive dependency that breaks in serverless environments.
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN;
-const DEFAULT_DATASET_ID = "0htieUNhOGPbc5mvN";
+const DEFAULT_DATASET_ID = "4lNFCWPdC5N6rVuiB";
 
 type ApifyDatasetItem = {
   id: string;
