@@ -442,19 +442,19 @@ function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
 
 const CATEGORY_IMAGES: Record<string, string> = {
   technologyAndEngineering: "/category_images/tech_engineering.jpg",
-  academicAndResearch:      "/category_images/academic_research.jpg",
-  careerAndNetworking:      "/category_images/career_networking.jpg",
-  healthAndWellness:        "/category_images/health_wellness.jpg",
-  socialAndCommunity:       "/category_images/social_community.jpg",
-  artsAndPerformance:       "/category_images/arts_performance.jpg",
-  music:                    "/category_images/music.jpg",
-  politicsAndAdvocacy:      "/category_images/politics_advocacy.jpg",
+  academicAndResearch: "/category_images/academic_research.jpg",
+  careerAndNetworking: "/category_images/career_networking.jpg",
+  healthAndWellness: "/category_images/health_wellness.jpg",
+  socialAndCommunity: "/category_images/social_community.jpg",
+  artsAndPerformance: "/category_images/arts_performance.jpg",
+  music: "/category_images/music.jpg",
+  politicsAndAdvocacy: "/category_images/politics_advocacy.jpg",
   culturalAndInternational: "/category_images/cultural_international.jpg",
-  volunteerAndService:      "/category_images/volunteer_service.jpg",
-  sportsAndRecreation:      "/category_images/sports_recreation.jpg",
-  foodAndDrinks:            "/category_images/food_drinks.jpg",
-  faithAndSpirituality:     "/category_images/faith_spirituality.jpg",
-  gamingAndEsports:         "/category_images/gaming_esports.jpg",
+  volunteerAndService: "/category_images/volunteer_service.jpg",
+  sportsAndRecreation: "/category_images/sports_recreation.jpg",
+  foodAndDrinks: "/category_images/food_drinks.jpg",
+  faithAndSpirituality: "/category_images/faith_spirituality.jpg",
+  gamingAndEsports: "/category_images/gaming_esports.jpg",
 };
 
 function getCategoryImage(category: string): string {
@@ -512,10 +512,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
 
   return {
     id: event.id,
-    title:
-      event.content?.title ??
-      event.extractedDetails?.title ??
-      "Untitled",
+    title: event.content?.title ?? event.extractedDetails?.title ?? "Untitled",
     organization:
       event.organization?.name ??
       event.content?.org_name ??
@@ -524,10 +521,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     date: formattedDate,
     startTime,
     endTime,
-    location:
-      event.content?.location ??
-      event.extractedDetails?.location ??
-      "",
+    location: event.content?.location ?? event.extractedDetails?.location ?? "",
     description:
       event.content?.descriptionText ??
       event.extractedDetails?.description ??
@@ -785,19 +779,42 @@ function useEvents() {
 
         // #region agent log
         const sourceCounts: Record<string, number> = {};
-        data.forEach((e) => { const s = e.source ?? "unknown"; sourceCounts[s] = (sourceCounts[s] ?? 0) + 1; });
-        console.log('[DBG 42a428][post-fix] sourceCounts:', JSON.stringify(sourceCounts), 'total:', data.length);
+        data.forEach((e) => {
+          const s = e.source ?? "unknown";
+          sourceCounts[s] = (sourceCounts[s] ?? 0) + 1;
+        });
+        console.log(
+          "[DBG 42a428][post-fix] sourceCounts:",
+          JSON.stringify(sourceCounts),
+          "total:",
+          data.length,
+        );
         // #endregion
 
-        const kept = data.filter((e) => e.content?.startTime || e.source === "instagram");
-        const dropped = data.filter((e) => !e.content?.startTime && e.source !== "instagram");
+        const kept = data.filter(
+          (e) => e.content?.startTime || e.source === "instagram",
+        );
+        const dropped = data.filter(
+          (e) => !e.content?.startTime && e.source !== "instagram",
+        );
 
         // #region agent log
         const droppedSources: Record<string, number> = {};
-        dropped.forEach((e) => { const s = e.source ?? "unknown"; droppedSources[s] = (droppedSources[s] ?? 0) + 1; });
+        dropped.forEach((e) => {
+          const s = e.source ?? "unknown";
+          droppedSources[s] = (droppedSources[s] ?? 0) + 1;
+        });
         const keptSources: Record<string, number> = {};
-        kept.forEach((e) => { const s = e.source ?? "unknown"; keptSources[s] = (keptSources[s] ?? 0) + 1; });
-        console.log('[DBG 42a428][post-fix] droppedSources:', JSON.stringify(droppedSources), '| keptSources:', JSON.stringify(keptSources));
+        kept.forEach((e) => {
+          const s = e.source ?? "unknown";
+          keptSources[s] = (keptSources[s] ?? 0) + 1;
+        });
+        console.log(
+          "[DBG 42a428][post-fix] droppedSources:",
+          JSON.stringify(droppedSources),
+          "| keptSources:",
+          JSON.stringify(keptSources),
+        );
         // #endregion
 
         const mapped: EventCard[] = [];
@@ -806,12 +823,20 @@ function useEvents() {
           try {
             mapped.push(mapDBEventToCard(e));
           } catch (mapErr) {
-            mapErrors.push(`${e.id}(${e.source}): ${(mapErr as Error).message}`);
+            mapErrors.push(
+              `${e.id}(${e.source}): ${(mapErr as Error).message}`,
+            );
           }
         }
 
         // #region agent log
-        console.log('[DBG 42a428][post-fix] mapped:', mapped.length, 'errors:', mapErrors.length, JSON.stringify(mapErrors.slice(0, 5)));
+        console.log(
+          "[DBG 42a428][post-fix] mapped:",
+          mapped.length,
+          "errors:",
+          mapErrors.length,
+          JSON.stringify(mapErrors.slice(0, 5)),
+        );
         // #endregion
 
         setCards(mapped);
