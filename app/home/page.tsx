@@ -800,7 +800,7 @@ function useEvents() {
         console.log('[DBG 42a428][post-fix] droppedSources:', JSON.stringify(droppedSources), '| keptSources:', JSON.stringify(keptSources));
         // #endregion
 
-        let mapped: EventCard[] = [];
+        const mapped: EventCard[] = [];
         const mapErrors: string[] = [];
         for (const e of kept) {
           try {
