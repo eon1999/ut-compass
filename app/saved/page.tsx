@@ -4,14 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { doc, getDoc, setDoc, arrayRemove, updateDoc, deleteField } from "firebase/firestore";
-import { Calendar, MapPin, House, Fish, Settings, User } from "lucide-react";
+import { Calendar, MapPin, House, Fish, Settings, User, Search } from "lucide-react";
 import Image from "next/image"
 import { getDb } from "@/lib/firebase";
 import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
-
-interface Tag {
-  label: string;
-}
+import { getCategoryStyle } from "@/lib/categories";
 
 interface EventCard {
   id: string;
@@ -22,7 +19,7 @@ interface EventCard {
   location: string;
   description: string;
   descriptionHtml?: string;
-  tags: Tag[];
+  tags: string[];
 }
 
 interface FirestoreTimestamp {
@@ -43,13 +40,17 @@ interface DBEvent {
     startTime: string | FirestoreTimestamp;
     endTime?: string | FirestoreTimestamp;
   };
-  tags: {
+  tags?: {
     primary_category: string;
     confidence_score: number;
     all_scores: Record<string, number>;
     model_version: string;
   };
-  manual_override: {
+  weights?: {
+    categories?: Record<string, number>;
+    majors?: Record<string, number>;
+  };
+  manual_override?: {
     is_forced: boolean;
     forced_category: string | null;
   };
@@ -77,15 +78,12 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     hour12: true,
   });
 
-  const topTags = event.tags?.all_scores
-    ? Object.entries(event.tags.all_scores)
-        .filter(([, score]) => score > 0.1)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 2)
-        .map(([label]) => ({ label }))
-    : [];
-
-  const primaryCategory = event.tags?.primary_category ?? "Uncategorized";
+  const primaryCategory =
+    event.tags?.primary_category ??
+    (event.weights?.categories
+      ? Object.entries(event.weights.categories).sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0]
+      : undefined) ??
+    "other";
 
   const endTime = event.content.endTime
     ? parseStartTime(event.content.endTime)
@@ -100,7 +98,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     location: event.content.location,
     description: event.content.descriptionText,
     descriptionHtml: event.content.descriptionHtml,
-    tags: [{ label: primaryCategory }, ...topTags],
+    tags: [primaryCategory],
   };
 }
 
@@ -211,14 +209,14 @@ function SavedEventCard({
       <div className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">
-            {card.tags.map((tag) => (
-              <span
-                key={tag.label}
-                className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700"
-              >
-                {tag.label}
-              </span>
-            ))}
+            {card.tags.map((key) => {
+              const cat = getCategoryStyle(key);
+              return (
+                <span key={key} className={`text-xs font-medium px-2.5 py-1 rounded-full ${cat.bg} ${cat.text}`}>
+                  {cat.label}
+                </span>
+              );
+            })}
           </div>
           <button
             onClick={() => onUnsave(card.id)}
@@ -352,6 +350,7 @@ export default function Page() {
   const [allEvents, setAllEvents] = useState<EventCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [unsavePending, setUnsavePending] = useState<EventCard | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const currentUser: User = {
     name: user?.displayName ?? user?.email ?? "Student",
@@ -437,7 +436,15 @@ export default function Page() {
     handleUnsave(eventId);
   }
 
-  const savedEvents = allEvents.filter((e) => savedIds.has(e.id));
+  const query = searchQuery.toLowerCase().trim();
+  const savedEvents = allEvents
+    .filter((e) => savedIds.has(e.id))
+    .filter((e) =>
+      !query ||
+      e.title.toLowerCase().includes(query) ||
+      e.location.toLowerCase().includes(query) ||
+      e.tags.some((t) => getCategoryStyle(t).label.toLowerCase().includes(query))
+    );
 
   return (
     <div className="relative flex min-h-screen font-sans">
@@ -451,8 +458,18 @@ export default function Page() {
       <Sidebar user={currentUser} />
 
       <div className="relative z-10 flex flex-col flex-1 min-w-0">
-        <header className="flex items-center px-8 py-5 bg-white border-b border-gray-100">
-          <h1 className="text-2xl font-bold text-blue-900">Your Saved Events</h1>
+        <header className="flex items-center gap-4 px-8 py-5 bg-white border-b border-gray-100">
+          <h1 className="text-2xl font-bold text-blue-900 shrink-0">Your Saved Events</h1>
+          <div className="relative ml-auto w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search saved events..."
+              className="w-full border border-gray-200 rounded-full pl-9 pr-4 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
         </header>
 
         <div className="px-8 py-6 flex-1">
@@ -461,13 +478,17 @@ export default function Page() {
           )}
           {!loading && savedEvents.length === 0 && (
             <div className="flex flex-col items-center justify-center py-24 text-center">
-              <span className="text-4xl mb-3">
-                <Fish className="h-6 w-6 text-[#1a3a5c]" />
-              </span>
-              <p className="text-blue-900 text-base">No saved events yet.</p>
-              <p className="text-blue-900 text-sm mt-1">
-                Bookmark events from the dashboard to see them here.
-              </p>
+              <Fish className="h-6 w-6 text-[#1a3a5c] mb-3" />
+              {query ? (
+                <p className="text-blue-900 text-base">No saved events match &ldquo;{searchQuery}&rdquo;.</p>
+              ) : (
+                <>
+                  <p className="text-blue-900 text-base">No saved events yet.</p>
+                  <p className="text-blue-900 text-sm mt-1">
+                    Bookmark events from the dashboard to see them here.
+                  </p>
+                </>
+              )}
             </div>
           )}
           {!loading && savedEvents.length > 0 && (

@@ -10,10 +10,7 @@ import { getDb } from "@/lib/firebase";
 import { addToGoogleCalendar, deleteFromGoogleCalendar } from "@/lib/googleCalendar";
 import { buildUserPreferences } from "@/lib/scoring/eventScorer";
 import { applyEventFilters, type SortBy, type SourceFilter } from "@/lib/filtering/eventFilter";
-
-interface Tag {
-  label: string;
-}
+import { getCategoryStyle } from "@/lib/categories";
 
 interface EventCard {
   id: string;
@@ -25,7 +22,7 @@ interface EventCard {
   location: string;
   description: string;
   descriptionHtml?: string;
-  tags: Tag[];
+  tags: string[];
   imageUrl?: string;
   source?: string;
   weights?: {
@@ -261,11 +258,14 @@ function EventCardItem({ card, isSaved, onToggleSave, isConflicting }: { card: E
         {/* Tags + bookmark */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">
-            {card.tags.map((tag) => (
-              <span key={tag.label} className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-                {tag.label}
-              </span>
-            ))}
+            {card.tags.map((key) => {
+              const cat = getCategoryStyle(key);
+              return (
+                <span key={key} className={`text-xs font-medium px-2.5 py-1 rounded-full ${cat.bg} ${cat.text}`}>
+                  {cat.label}
+                </span>
+              );
+            })}
           </div>
           <button
             onClick={() => onToggleSave(card.id)}
@@ -377,15 +377,12 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     hour12: true,
   });
 
-  const topTags = event.tags?.all_scores
-    ? Object.entries(event.tags.all_scores)
-        .filter(([, score]) => score > 0.1)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 2)
-        .map(([label]) => ({ label }))
-    : [];
-
-  const primaryCategory = event.tags?.primary_category ?? "Uncategorized";
+  const primaryCategory =
+    event.tags?.primary_category ??
+    (event.weights?.categories
+      ? Object.entries(event.weights.categories).sort(([, a], [, b]) => b - a)[0]?.[0]
+      : undefined) ??
+    "other";
 
   const endTime = event.content.endTime
     ? parseStartTime(event.content.endTime)
@@ -401,10 +398,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     location: event.content.location,
     description: event.content.descriptionText,
     descriptionHtml: event.content.descriptionHtml,
-    tags: [
-      { label: primaryCategory },
-      ...topTags,
-    ],
+    tags: [primaryCategory],
     source: event.source,
     weights: event.weights,
   };
@@ -726,7 +720,7 @@ export default function Page() {
         c.title.toLowerCase().includes(query) ||
         c.organization.toLowerCase().includes(query) ||
         c.location.toLowerCase().includes(query) ||
-        c.tags.some((t) => t.label.toLowerCase().includes(query))
+        c.tags.some((t) => getCategoryStyle(t).label.toLowerCase().includes(query))
       )
     : cards;
 
