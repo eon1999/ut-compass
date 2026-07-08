@@ -21,6 +21,7 @@ import {
   Search,
 } from "lucide-react";
 import Image from "next/image";
+import DOMPurify from "dompurify";
 import { getDb } from "@/lib/firebase";
 import {
   addToGoogleCalendar,
@@ -306,7 +307,7 @@ function SavedEventCard({
           <div
             ref={descRef as React.RefObject<HTMLDivElement>}
             className={`text-xs text-gray-500 mt-1 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden ${expanded ? "" : "line-clamp-3"}`}
-            dangerouslySetInnerHTML={{ __html: card.descriptionHtml }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(card.descriptionHtml) }}
           />
         ) : (
           <p

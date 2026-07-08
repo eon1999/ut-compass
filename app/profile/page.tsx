@@ -327,7 +327,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.push("/signup");
+      router.push("/");
       return;
     }
 

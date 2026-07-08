@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -22,18 +22,23 @@ import {
   User,
 } from "lucide-react";
 import Image from "next/image";
+import DOMPurify from "dompurify";
 import { getDb } from "@/lib/firebase";
 import {
   addToGoogleCalendar,
   deleteFromGoogleCalendar,
 } from "@/lib/googleCalendar";
-import { buildUserPreferences } from "@/lib/scoring/eventScorer";
+import {
+  buildUserPreferences,
+  getSimilarEvents,
+} from "@/lib/scoring/eventScorer";
 import {
   applyEventFilters,
   type SortBy,
   type SourceFilter,
+  type DateRange,
 } from "@/lib/filtering/eventFilter";
-import { getCategoryStyle } from "@/lib/categories";
+import { getCategoryStyle, CATEGORY_CONFIG } from "@/lib/categories";
 
 interface EventCard {
   id: string;
@@ -212,6 +217,14 @@ function Header({ name, savedCount }: { name: string; savedCount: number }) {
   );
 }
 
+const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
+  { value: "all", label: "All Dates" },
+  { value: "today", label: "Today" },
+  { value: "thisWeek", label: "This Week" },
+  { value: "thisWeekend", label: "This Weekend" },
+  { value: "nextWeek", label: "Next Week" },
+];
+
 function SearchAndFilters({
   excludeConflicting,
   onToggleExclude,
@@ -221,6 +234,10 @@ function SearchAndFilters({
   onSortByChange,
   sourceFilter,
   onSourceFilterChange,
+  dateRange,
+  onDateRangeChange,
+  categoryFilter,
+  onCategoryFilterChange,
 }: {
   excludeConflicting: boolean;
   onToggleExclude: () => void;
@@ -230,62 +247,136 @@ function SearchAndFilters({
   onSortByChange: (v: SortBy) => void;
   sourceFilter: SourceFilter;
   onSourceFilterChange: (v: SourceFilter) => void;
+  dateRange: DateRange;
+  onDateRangeChange: (v: DateRange) => void;
+  categoryFilter: string[];
+  onCategoryFilterChange: (keys: string[]) => void;
 }) {
   const selectClass =
     "border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-700 bg-white outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer hover:bg-gray-50 transition appearance-none pr-8";
 
+  const hasActiveFilters =
+    dateRange !== "all" ||
+    categoryFilter.length > 0 ||
+    sourceFilter !== "all" ||
+    sortBy !== "none";
+
+  function toggleCategory(key: string) {
+    if (categoryFilter.includes(key)) {
+      onCategoryFilterChange(categoryFilter.filter((k) => k !== key));
+    } else {
+      onCategoryFilterChange([...categoryFilter, key]);
+    }
+  }
+
+  function clearAll() {
+    onDateRangeChange("all");
+    onCategoryFilterChange([]);
+    onSourceFilterChange("all");
+    onSortByChange("none");
+  }
+
   return (
-    <div className="flex gap-3 flex-wrap px-8 py-5">
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="Search Clubs, Events, and More..."
-        className="flex-1 min-w-48 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-200"
-      />
+    <div className="flex flex-col gap-3 px-8 py-5 border-b border-gray-100">
+      {/* Row 1: search + sort + source + exclude */}
+      <div className="flex gap-3 flex-wrap items-center">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search Clubs, Events, and More..."
+          className="flex-1 min-w-48 border border-gray-200 rounded-full px-4 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-200"
+        />
 
-      <div className="relative">
-        <select
-          value={sortBy}
-          onChange={(e) => onSortByChange(e.target.value as SortBy)}
-          className={selectClass}
+        <div className="relative">
+          <select
+            value={sortBy}
+            onChange={(e) => onSortByChange(e.target.value as SortBy)}
+            className={selectClass}
+          >
+            <option value="none">Sort: Default</option>
+            <option value="categoryMatch">Sort: Category Match</option>
+            <option value="majorMatch">Sort: Major Match</option>
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+            ▾
+          </span>
+        </div>
+
+        <div className="relative">
+          <select
+            value={sourceFilter}
+            onChange={(e) => onSourceFilterChange(e.target.value as SourceFilter)}
+            className={selectClass}
+          >
+            <option value="all">Source: All</option>
+            <option value="hornslink">Source: HornsLink</option>
+            <option value="instagram">Source: Instagram</option>
+            <option value="manual">Source: Manual</option>
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+            ▾
+          </span>
+        </div>
+
+        <button
+          onClick={onToggleExclude}
+          className={`flex items-center gap-1 border rounded-full px-4 py-2 text-sm transition ${
+            excludeConflicting
+              ? "border-blue-500 bg-blue-50 text-blue-700"
+              : "border-gray-200 text-gray-700 hover:bg-gray-50"
+          }`}
         >
-          <option value="none">Sort: Default</option>
-          <option value="categoryMatch">Sort: Category Match</option>
-          <option value="majorMatch">Sort: Major Match</option>
-        </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-          ▾
-        </span>
+          Exclude Conflicting
+          <Eye className="h-4 w-4" />
+        </button>
+
+        {hasActiveFilters && (
+          <button
+            onClick={clearAll}
+            className="text-sm text-gray-400 hover:text-gray-600 transition ml-auto"
+          >
+            × Clear filters
+          </button>
+        )}
       </div>
 
-      <div className="relative">
-        <select
-          value={sourceFilter}
-          onChange={(e) => onSourceFilterChange(e.target.value as SourceFilter)}
-          className={selectClass}
-        >
-          <option value="all">Source: All</option>
-          <option value="hornslink">Source: HornsLink</option>
-          <option value="instagram">Source: Instagram</option>
-          <option value="manual">Source: Manual</option>
-        </select>
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-          ▾
-        </span>
+      {/* Row 2: date range pills */}
+      <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
+        {DATE_RANGE_OPTIONS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => onDateRangeChange(value)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition ${
+              dateRange === value
+                ? "bg-blue-900 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      <button
-        onClick={onToggleExclude}
-        className={`flex items-center gap-1 border rounded-full px-4 py-2 text-sm transition ${
-          excludeConflicting
-            ? "border-blue-500 bg-blue-50 text-blue-700"
-            : "border-gray-200 text-gray-700 hover:bg-gray-50"
-        }`}
-      >
-        Exclude Conflicting
-        <Eye className="h-4 w-4" />
-      </button>
+      {/* Row 3: category filter pills */}
+      <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
+        {Object.entries(CATEGORY_CONFIG).map(([key, style]) => {
+          const active = categoryFilter.includes(key);
+          return (
+            <button
+              key={key}
+              onClick={() => toggleCategory(key)}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+                active
+                  ? `${style.bg} ${style.text} ring-1 ring-current`
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+            >
+              {style.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -295,24 +386,21 @@ function EventCardItem({
   isSaved,
   onToggleSave,
   isConflicting,
+  onClick,
 }: {
   card: EventCard;
   isSaved: boolean;
   onToggleSave: (id: string) => void;
   isConflicting?: boolean;
+  onClick: (card: EventCard) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [isClamped, setIsClamped] = useState(false);
-  const descRef = useRef<HTMLDivElement | HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    const el = descRef.current;
-    if (el) setIsClamped(el.scrollHeight > el.clientHeight);
-  }, [card.description, card.descriptionHtml]);
-
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow ${isConflicting ? "opacity-40 grayscale" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onClick(card)}
+      onKeyDown={(e) => e.key === "Enter" && onClick(card)}
+      className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow cursor-pointer ${isConflicting ? "opacity-40 grayscale" : ""}`}
     >
       {/* Category image */}
       <div className="h-36 relative overflow-hidden bg-gray-100">
@@ -341,7 +429,10 @@ function EventCardItem({
             })}
           </div>
           <button
-            onClick={() => onToggleSave(card.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSave(card.id);
+            }}
             className="shrink-0 text-lg leading-none"
             aria-label={isSaved ? "Unsave event" : "Save event"}
           >
@@ -363,40 +454,20 @@ function EventCardItem({
 
         {/* Date & Location */}
         <div className="flex flex-col gap-1 text-xs text-blue-600">
-          {/* Replace with illustration */}
           <span className="flex items-center gap-1">
-            <Calendar className="h-4 w-4"></Calendar>
+            <Calendar className="h-4 w-4" />
             {card.date}
           </span>
           <span className="flex items-center gap-1">
-            <MapPin className="h-4 w-4"></MapPin>
+            <MapPin className="h-4 w-4" />
             {card.location}
           </span>
         </div>
 
-        {/* Description */}
-        {card.descriptionHtml ? (
-          <div
-            ref={descRef as React.RefObject<HTMLDivElement>}
-            className={`text-xs text-gray-500 mt-1 [&_a]:underline [&_a]:text-blue-600 [&_br]:hidden ${expanded ? "" : "line-clamp-3"}`}
-            dangerouslySetInnerHTML={{ __html: card.descriptionHtml }}
-          />
-        ) : (
-          <p
-            ref={descRef as React.RefObject<HTMLParagraphElement>}
-            className={`text-xs text-gray-500 mt-1 ${expanded ? "" : "line-clamp-3"}`}
-          >
-            {card.description}
-          </p>
-        )}
-        {(isClamped || expanded) && (
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="text-xs text-blue-600 hover:underline self-start mt-0.5"
-          >
-            {expanded ? "Show less" : "Show more"}
-          </button>
-        )}
+        {/* Description preview */}
+        <p className="text-xs text-gray-500 mt-1 line-clamp-3">
+          {card.description || "Click to view details."}
+        </p>
       </div>
     </div>
   );
@@ -537,6 +608,207 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     source: event.source,
     weights: event.weights,
   };
+}
+
+function SimilarEventMiniCard({
+  card,
+  isSaved,
+  onToggleSave,
+  onClick,
+}: {
+  card: EventCard;
+  isSaved: boolean;
+  onToggleSave: (id: string) => void;
+  onClick: (card: EventCard) => void;
+}) {
+  const cat = getCategoryStyle(card.tags[0]);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onClick(card)}
+      onKeyDown={(e) => e.key === "Enter" && onClick(card)}
+      className="flex gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition cursor-pointer"
+    >
+      <div className="w-14 h-14 relative shrink-0 rounded-lg overflow-hidden bg-gray-100">
+        <Image
+          src={getCategoryImage(card.tags[0])}
+          alt={cat.label}
+          fill
+          className="object-cover"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-900 truncate">{card.title}</p>
+        <p className="text-xs text-gray-500 truncate">{card.organization}</p>
+        <p className="text-xs text-blue-600 mt-0.5">{card.date}</p>
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleSave(card.id);
+        }}
+        className="shrink-0 self-start mt-0.5"
+        aria-label={isSaved ? "Unsave event" : "Save event"}
+      >
+        {isSaved ? (
+          <Fish className="h-5 w-5 fill-[#1a3a5c] text-[#1a3a5c]" />
+        ) : (
+          <Fish className="h-5 w-5 text-[#1a3a5c]" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function EventDetailPanel({
+  card,
+  allCards,
+  savedIds,
+  onToggleSave,
+  onDismiss,
+  onSelectCard,
+}: {
+  card: EventCard;
+  allCards: EventCard[];
+  savedIds: Set<string>;
+  onToggleSave: (id: string) => void;
+  onDismiss: () => void;
+  onSelectCard: (card: EventCard) => void;
+}) {
+  const isSaved = savedIds.has(card.id);
+  const similarEvents = getSimilarEvents(card, allCards, 4);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/30 z-40"
+        onClick={onDismiss}
+        aria-hidden="true"
+      />
+
+      {/* Panel */}
+      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right">
+        {/* Header bar */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <button
+            onClick={onDismiss}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition"
+          >
+            ← Back
+          </button>
+          <button
+            onClick={() => onToggleSave(card.id)}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-medium transition"
+            style={
+              isSaved
+                ? { borderColor: "#1a3a5c", color: "#1a3a5c", background: "#f0f4f8" }
+                : { borderColor: "#d1d5db", color: "#374151" }
+            }
+          >
+            <Fish
+              className="h-4 w-4"
+              style={isSaved ? { fill: "#1a3a5c" } : {}}
+            />
+            {isSaved ? "Saved" : "Save"}
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1">
+          {/* Hero image */}
+          <div className="h-52 relative bg-gray-100 shrink-0">
+            <Image
+              src={getCategoryImage(card.tags[0])}
+              alt={getCategoryStyle(card.tags[0]).label}
+              fill
+              className="object-cover"
+            />
+          </div>
+
+          <div className="p-5 flex flex-col gap-4">
+            {/* Category tags */}
+            <div className="flex flex-wrap gap-1.5">
+              {card.tags.map((key) => {
+                const cat = getCategoryStyle(key);
+                return (
+                  <span
+                    key={key}
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full ${cat.bg} ${cat.text}`}
+                  >
+                    {cat.label}
+                  </span>
+                );
+              })}
+            </div>
+
+            {/* Title */}
+            <h2 className="text-xl font-bold text-gray-900 leading-snug">
+              {card.title}
+            </h2>
+
+            {/* Meta */}
+            <div className="flex flex-col gap-2 text-sm text-gray-600">
+              {card.organization && (
+                <span className="font-medium text-gray-700">{card.organization}</span>
+              )}
+              <span className="flex items-center gap-2 text-blue-600">
+                <Calendar className="h-4 w-4 shrink-0" />
+                {card.date}
+              </span>
+              {card.location && (
+                <span className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 shrink-0 text-blue-600" />
+                  {card.location}
+                </span>
+              )}
+            </div>
+
+            <hr className="border-gray-100" />
+
+            {/* Full description */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">About</h3>
+              {card.descriptionHtml ? (
+                <div
+                  className="text-sm text-gray-600 leading-relaxed [&_a]:underline [&_a]:text-blue-600"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(card.descriptionHtml) }}
+                />
+              ) : (
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {card.description || "No description available."}
+                </p>
+              )}
+            </div>
+
+            {/* Similar events */}
+            {similarEvents.length > 0 && (
+              <>
+                <hr className="border-gray-100" />
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                    Similar Events
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    {similarEvents.map((similar) => (
+                      <SimilarEventMiniCard
+                        key={similar.id}
+                        card={similar}
+                        isSaved={savedIds.has(similar.id)}
+                        onToggleSave={onToggleSave}
+                        onClick={onSelectCard}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
 function GCalModal({
@@ -783,36 +1055,10 @@ function useEvents() {
         if (!res.ok) throw new Error("Failed to fetch events");
         const data: DBEvent[] = await res.json();
 
-        // #region agent log
-        const sourceCounts: Record<string, number> = {};
-        data.forEach((e) => { const s = e.source ?? "unknown"; sourceCounts[s] = (sourceCounts[s] ?? 0) + 1; });
-        console.log('[DBG 42a428][post-fix] sourceCounts:', JSON.stringify(sourceCounts), 'total:', data.length);
-        // #endregion
 
         const kept = data.filter((e) => e.content?.startTime || e.source === "instagram");
-        const dropped = data.filter((e) => !e.content?.startTime && e.source !== "instagram");
-
-        // #region agent log
-        const droppedSources: Record<string, number> = {};
-        dropped.forEach((e) => { const s = e.source ?? "unknown"; droppedSources[s] = (droppedSources[s] ?? 0) + 1; });
-        const keptSources: Record<string, number> = {};
-        kept.forEach((e) => { const s = e.source ?? "unknown"; keptSources[s] = (keptSources[s] ?? 0) + 1; });
-        console.log('[DBG 42a428][post-fix] droppedSources:', JSON.stringify(droppedSources), '| keptSources:', JSON.stringify(keptSources));
-        // #endregion
 
         let mapped: EventCard[] = [];
-        const mapErrors: string[] = [];
-        for (const e of kept) {
-          try {
-            mapped.push(mapDBEventToCard(e));
-          } catch (mapErr) {
-            mapErrors.push(`${e.id}(${e.source}): ${(mapErr as Error).message}`);
-          }
-        }
-
-        // #region agent log
-        console.log('[DBG 42a428][post-fix] mapped:', mapped.length, 'errors:', mapErrors.length, JSON.stringify(mapErrors.slice(0, 5)));
-        // #endregion
 
         setCards(mapped);
       } catch (err) {
@@ -870,6 +1116,9 @@ export default function Page() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("none");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<EventCard | null>(null);
   const [gcalPending, setGcalPending] = useState<EventCard | null>(null);
   const [unsavePending, setUnsavePending] = useState<EventCard | null>(null);
 
@@ -927,6 +1176,7 @@ export default function Page() {
           c.title.toLowerCase().includes(query) ||
           c.organization.toLowerCase().includes(query) ||
           c.location.toLowerCase().includes(query) ||
+          c.description.toLowerCase().includes(query) ||
           c.tags.some((t) =>
             getCategoryStyle(t).label.toLowerCase().includes(query),
           ),
@@ -935,7 +1185,7 @@ export default function Page() {
 
   const filteredCards = applyEventFilters(
     searchedCards,
-    { sortBy, sourceFilter },
+    { sortBy, sourceFilter, categoryFilter, dateRange },
     userPrefs,
     majorPrefs,
   );
@@ -962,14 +1212,6 @@ export default function Page() {
       <Sidebar user={currentUser} />
 
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Top bar
-        <header className="flex justify-end items-center gap-3 px-8 py-3 bg-white border-b border-gray-100">
-          <div className="flex items-center gap-2 border border-gray-200 rounded-full px-4 py-1.5 text-sm font-semibold text-gray-700">
-            <Fish></Fish>
-            {savedIds.size} Total Caught
-          </div>
-        </header> */}
-
         <Header
           name={currentUser.name.split(" ")[0]}
           savedCount={savedIds.size}
@@ -984,10 +1226,14 @@ export default function Page() {
           onSortByChange={setSortBy}
           sourceFilter={sourceFilter}
           onSourceFilterChange={setSourceFilter}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          categoryFilter={categoryFilter}
+          onCategoryFilterChange={setCategoryFilter}
         />
 
         {/* Main content + sidebar */}
-        <div className="flex gap-6 px-8 pb-8 flex-1">
+        <div className="flex gap-6 px-8 pb-8 pt-6 flex-1">
           {/* Cards grid */}
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 content-start">
             {loading && (
@@ -998,6 +1244,11 @@ export default function Page() {
             {error && (
               <p className="text-red-500 col-span-3 text-center py-10">
                 {error}
+              </p>
+            )}
+            {!loading && !error && filteredCards.length === 0 && (
+              <p className="text-gray-400 col-span-3 text-center py-10">
+                No events match your filters.
               </p>
             )}
             {!loading &&
@@ -1011,6 +1262,7 @@ export default function Page() {
                   isConflicting={
                     excludeConflicting && conflictingIds.has(card.id)
                   }
+                  onClick={setSelectedEvent}
                 />
               ))}
           </div>
@@ -1019,6 +1271,18 @@ export default function Page() {
           <UpcomingEventsPanel events={upcomingEvents} />
         </div>
       </div>
+
+      {/* Event detail slide-over */}
+      {selectedEvent && (
+        <EventDetailPanel
+          card={selectedEvent}
+          allCards={cards}
+          savedIds={savedIds}
+          onToggleSave={handleToggleSave}
+          onDismiss={() => setSelectedEvent(null)}
+          onSelectCard={setSelectedEvent}
+        />
+      )}
 
       {gcalPending && (
         <GCalModal

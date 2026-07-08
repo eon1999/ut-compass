@@ -127,3 +127,60 @@ export function scoreEvent(
   }
   return score;
 }
+
+// --- Similarity ---
+
+interface SimilarEvent {
+  id: string;
+  weights?: {
+    categories?: Record<string, number>;
+  };
+}
+
+/**
+ * Cosine similarity between two category weight vectors.
+ * Returns a value in [0, 1]; returns 0 if either vector is all-zeros.
+ */
+function cosineSimilarity(
+  a: Record<string, number>,
+  b: Record<string, number>,
+): number {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (const k of keys) {
+    const va = a[k] ?? 0;
+    const vb = b[k] ?? 0;
+    dot += va * vb;
+    normA += va * va;
+    normB += vb * vb;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/**
+ * Returns the top N events most similar to the target event,
+ * ranked by cosine similarity of their weights.categories vectors.
+ * The target event itself is excluded from results.
+ * Events without category weights are excluded.
+ */
+export function getSimilarEvents<T extends SimilarEvent>(
+  target: T,
+  allEvents: T[],
+  topN = 4,
+): T[] {
+  const targetCats = target.weights?.categories;
+  if (!targetCats) return [];
+
+  return allEvents
+    .filter((e) => e.id !== target.id && e.weights?.categories)
+    .map((e) => ({
+      event: e,
+      score: cosineSimilarity(targetCats, e.weights!.categories!),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN)
+    .map((x) => x.event);
+}
