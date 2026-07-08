@@ -513,19 +513,19 @@ function UpcomingEventsPanel({ events }: { events: UpcomingEvent[] }) {
 
 const CATEGORY_IMAGES: Record<string, string> = {
   technologyAndEngineering: "/category_images/tech_engineering.jpg",
-  academicAndResearch:      "/category_images/academic_research.jpg",
-  careerAndNetworking:      "/category_images/career_networking.jpg",
-  healthAndWellness:        "/category_images/health_wellness.jpg",
-  socialAndCommunity:       "/category_images/social_community.jpg",
-  artsAndPerformance:       "/category_images/arts_performance.jpg",
-  music:                    "/category_images/music.jpg",
-  politicsAndAdvocacy:      "/category_images/politics_advocacy.jpg",
+  academicAndResearch: "/category_images/academic_research.jpg",
+  careerAndNetworking: "/category_images/career_networking.jpg",
+  healthAndWellness: "/category_images/health_wellness.jpg",
+  socialAndCommunity: "/category_images/social_community.jpg",
+  artsAndPerformance: "/category_images/arts_performance.jpg",
+  music: "/category_images/music.jpg",
+  politicsAndAdvocacy: "/category_images/politics_advocacy.jpg",
   culturalAndInternational: "/category_images/cultural_international.jpg",
-  volunteerAndService:      "/category_images/volunteer_service.jpg",
-  sportsAndRecreation:      "/category_images/sports_recreation.jpg",
-  foodAndDrinks:            "/category_images/food_drinks.jpg",
-  faithAndSpirituality:     "/category_images/faith_spirituality.jpg",
-  gamingAndEsports:         "/category_images/gaming_esports.jpg",
+  volunteerAndService: "/category_images/volunteer_service.jpg",
+  sportsAndRecreation: "/category_images/sports_recreation.jpg",
+  foodAndDrinks: "/category_images/food_drinks.jpg",
+  faithAndSpirituality: "/category_images/faith_spirituality.jpg",
+  gamingAndEsports: "/category_images/gaming_esports.jpg",
 };
 
 function getCategoryImage(category: string): string {
@@ -583,10 +583,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
 
   return {
     id: event.id,
-    title:
-      event.content?.title ??
-      event.extractedDetails?.title ??
-      "Untitled",
+    title: event.content?.title ?? event.extractedDetails?.title ?? "Untitled",
     organization:
       event.organization?.name ??
       event.content?.org_name ??
@@ -595,10 +592,7 @@ function mapDBEventToCard(event: DBEvent): EventCard {
     date: formattedDate,
     startTime,
     endTime,
-    location:
-      event.content?.location ??
-      event.extractedDetails?.location ??
-      "",
+    location: event.content?.location ?? event.extractedDetails?.location ?? "",
     description:
       event.content?.descriptionText ??
       event.extractedDetails?.description ??
@@ -1055,10 +1049,14 @@ function useEvents() {
         if (!res.ok) throw new Error("Failed to fetch events");
         const data: DBEvent[] = await res.json();
 
+const kept = data.filter(
+          (e) => e.content?.startTime || e.source === "instagram",
+        );
 
-        const kept = data.filter((e) => e.content?.startTime || e.source === "instagram");
-
-        let mapped: EventCard[] = [];
+        const mapped: EventCard[] = [];
+        for (const e of kept) {
+          mapped.push(mapDBEventToCard(e));
+        }
 
         setCards(mapped);
       } catch (err) {
@@ -1214,7 +1212,7 @@ export default function Page() {
       <div className="flex flex-col flex-1 min-w-0">
         <Header
           name={currentUser.name.split(" ")[0]}
-          savedCount={savedIds.size}
+          savedCount={savedCards.length}
         />
 
         <SearchAndFilters

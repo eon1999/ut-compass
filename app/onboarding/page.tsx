@@ -12,7 +12,8 @@ import {
   Bubbles,
 } from "lucide-react";
 import { doc, setDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/lib/context/AuthContext";
 
 type OnboardingFormData = {
   firstName: string;
@@ -297,6 +298,7 @@ const isStepValid = (
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<OnboardingFormData>(() => {
     if (typeof window === "undefined") {
@@ -410,12 +412,15 @@ export default function OnboardingPage() {
   };
 
   const handleSubmit = async () => {
+    console.log("[handleSubmit] called", { currentStep, stepsLastIdx: steps.length - 1, canContinue, uid: user?.uid });
     if (currentStep !== steps.length - 1 || !canContinue) {
+      console.log("[handleSubmit] bailed: step/canContinue check");
       return;
     }
 
-    const uid = auth.currentUser?.uid;
+    const uid = user?.uid;
     if (!uid) {
+      console.log("[handleSubmit] bailed: no uid, user =", user);
       setSubmitted(false);
       return;
     }
@@ -425,7 +430,14 @@ export default function OnboardingPage() {
       submittedAt: new Date().toISOString(),
     };
 
-    await setDoc(doc(db, "users", uid), payload);
+    console.log("[handleSubmit] writing to Firestore...");
+    try {
+      await setDoc(doc(getDb(), "users", uid), payload);
+      console.log("[handleSubmit] Firestore write succeeded");
+    } catch (err) {
+      console.error("[handleSubmit] Firestore write failed", err);
+      return;
+    }
 
     window.localStorage.setItem(
       SUBMISSION_STORAGE_KEY,
@@ -433,6 +445,7 @@ export default function OnboardingPage() {
     );
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
     setSubmitted(true);
+    router.push("/profile");
   };
 
   if (submitted) {
