@@ -969,9 +969,9 @@ function useSavedEvents(userId: string | undefined) {
         if (data?.savedEventIds) setSavedIds(new Set(data.savedEventIds));
         if (data?.gcalEventIds) setGcalEventIds(data.gcalEventIds ?? {});
       })
-      .catch((err) =>
-        console.warn("useSavedEvents: failed to load saved events", err),
-      );
+      .catch(() => {
+        // Failed to load saved events - silently handle
+      });
   }, [userId]);
 
   async function toggleSave(eventId: string) {
@@ -1091,9 +1091,9 @@ function useUserProfile(uid?: string) {
         );
         setMajorPrefs(buildUserPreferences({ major: data.major }));
       })
-      .catch((err) =>
-        console.warn("useUserProfile: failed to load user preferences", err),
-      );
+      .catch(() => {
+        // Failed to load user preferences - silently handle
+      });
   }, [uid]);
 
   return { userPrefs, majorPrefs };

@@ -22,18 +22,14 @@ import { scrapeInstagramEvents } from "./scrapers/instagram";
 const instagramHandlesToScrape = ["txproduct", "txconvergent", "hookemhacks"];
 
 export async function handleHornslinkEventIngest(overwrite = false) {
-  console.log("Starting HornsLink event ingestion pipeline...");
-
   // we need to get all organizations first so we can pass their descriptions
   // they should be pulled from firestore
 
   try {
     // scrape dat thang
     const rawEvents = await scrapeHornsLinkEvents();
-    console.log(`Scraped ${rawEvents.length} events from HornsLink.`);
 
     if (rawEvents.length === 0) {
-      console.warn("No events scraped. Ending pipeline.");
       return;
     }
 
@@ -47,18 +43,11 @@ export async function handleHornslinkEventIngest(overwrite = false) {
         const docId = `${rawEvent.id}`;
         if (!overwrite) {
           const existingDoc = await db.collection("events").doc(docId).get();
-          console.log(
-            `Checking if event with ID ${docId} already exists in Firestore...`,
-          );
           if (existingDoc.exists) {
-            console.log(
-              `Event with ID ${docId} already exists. Skipping enrichment and Firestore push.`,
-            );
             continue;
           }
         }
 
-        console.log(`Processing event with HornsLink ID ${rawEvent.id}...`);
         // enrich the event data by calling our ml service
         const incomingEvent: IncomingEvent = {
           ...rawEvent,
@@ -71,23 +60,14 @@ export async function handleHornslinkEventIngest(overwrite = false) {
       } catch (error) {
         failureCount++;
         failedEvents.push(rawEvent.id);
-        console.error(
-          `Failed to process event with HornsLink ID ${rawEvent.id}:`,
-          error,
-        );
       }
     }
-
-    console.log(
-      `HornsLink Pipeline completed: ${successCount} successes, ${failureCount} failures. Failed events: ${failedEvents.join(", ")}`,
-    );
   } catch (error) {
-    console.error("Error in HornsLink event ingestion pipeline:", error);
+    // Pipeline error
   }
 }
 
 export async function handleInstagramEventIngest() {
-  console.log("Starting Instagram event ingestion pipeline...");
   let successCount = 0;
   let failureCount = 0;
   const failedEvents: string[] = [];
@@ -98,13 +78,9 @@ export async function handleInstagramEventIngest() {
     const instagramEvents = await scrapeInstagramEvents(
       instagramHandlesToScrape,
     );
-    console.log(`Scraped ${instagramEvents.length} Instagram posts.`);
 
     for (const instaEvent of instagramEvents) {
       if (instaEvent.error) {
-        console.log(
-          `Skipping Instagram post ${instaEvent.id || "unknown"} due to error property being set: ${instaEvent.error}`,
-        );
         failureCount++;
         failedEvents.push(instaEvent.id || "unknown");
         continue;
@@ -129,30 +105,19 @@ export async function handleInstagramEventIngest() {
       } catch (error) {
         failureCount++;
         failedEvents.push(instaEvent.id);
-        console.error(
-          `Failed to process Instagram event with ID ${instaEvent.id}:`,
-          error,
-        );
       }
     }
-
-    console.log(
-      `Instagram Pipeline completed: ${successCount} successes, ${failureCount} failures. Failed events: ${failedEvents.join(", ")}`,
-    );
   } catch (error) {
-    console.error("Error in Instagram event ingestion pipeline:", error);
+    // Pipeline error
   }
 }
 
 export async function handleOrganizationIngest() {
-  console.log("Starting organization ingestion pipeline...");
-
   try {
     // scrape organizations from hornslink
     // orgs change infrequently, we might
     // want to make sure we don't call this too often
     const rawOrgs = await scrapeHornsLinkOrganizations();
-    console.log(`Scraped ${rawOrgs.length} organizations from HornsLink.`);
 
     // no need to enrich org data, just push to firestore
     for (const rawOrg of rawOrgs) {
@@ -161,9 +126,6 @@ export async function handleOrganizationIngest() {
         .doc(`${rawOrg.id}`)
         .get();
       if (existingDoc.exists) {
-        console.log(
-          `Organization with ID ${rawOrg.id} already exists. Skipping Firestore push.`,
-        );
         continue;
       }
       await pushOrganizationToFireStore({
@@ -172,6 +134,6 @@ export async function handleOrganizationIngest() {
       });
     }
   } catch (error) {
-    console.error("Error in organization ingestion pipeline:", error);
+    // Pipeline error
   }
 }
