@@ -39,6 +39,7 @@ import {
   type DateRange,
 } from "@/lib/filtering/eventFilter";
 import { getCategoryStyle, CATEGORY_CONFIG } from "@/lib/categories";
+import { DebugPanel } from "@/lib/debug/DebugPanel";
 
 interface EventCard {
   id: string;
@@ -1316,6 +1317,7 @@ export default function Page() {
           onDismiss={() => setUnsavePending(null)}
         />
       )}
+      <DebugPanel position="bottom-right" defaultOpen={false} />
     </div>
   );
 }

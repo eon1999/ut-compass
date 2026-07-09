@@ -18,18 +18,31 @@ import {
 } from "@/lib/db/pushToFirestore";
 import { db } from "@/lib/db/firebaseAdmin";
 import { scrapeInstagramEvents } from "./scrapers/instagram";
+import { getLogger } from "@/lib/logger";
 
+const logger = getLogger({ component: "pipeline" });
 const instagramHandlesToScrape = ["txproduct", "txconvergent", "hookemhacks"];
 
 export async function handleHornslinkEventIngest(overwrite = false) {
-  // we need to get all organizations first so we can pass their descriptions
-  // they should be pulled from firestore
+  const timer = logger.time("handleHornslinkEventIngest");
+  logger.pipelineStep("start", { overwrite, source: "hornslink" });
 
   try {
-    // scrape dat thang
+    // Scrape events from HornsLink
+    logger.pipelineStep("scrape_hornslink_events");
+    const scrapeTimer = logger.time("scrapeHornsLinkEvents");
     const rawEvents = await scrapeHornsLinkEvents();
+    scrapeTimer();
+
+    logger.info(`Scraped ${rawEvents.length} events from HornsLink`, {
+      operation: "scrape",
+      source: "hornslink",
+      count: rawEvents.length,
+    });
 
     if (rawEvents.length === 0) {
+      logger.warn("No events found from HornsLink");
+      timer();
       return;
     }
 
@@ -37,57 +50,120 @@ export async function handleHornslinkEventIngest(overwrite = false) {
     let failureCount = 0;
     const failedEvents: string[] = [];
 
-    // enrich dat thang
+    // Process each event
+    logger.pipelineStep("enrich_and_store_events", { totalEvents: rawEvents.length });
+
     for (const rawEvent of rawEvents) {
+      const eventTimer = logger.time(`process_event_${rawEvent.id}`);
       try {
         const docId = `${rawEvent.id}`;
+
         if (!overwrite) {
+          logger.dbOperation("check_existing", "events", { docId });
           const existingDoc = await db.collection("events").doc(docId).get();
           if (existingDoc.exists) {
+            logger.debug(`Event ${docId} already exists, skipping`, { docId, action: "skipped" });
+            eventTimer();
             continue;
           }
         }
 
-        // enrich the event data by calling our ml service
+        // Enrich the event data by calling our ML service
+        logger.pipelineStep("enrich_event", { eventId: rawEvent.id });
         const incomingEvent: IncomingEvent = {
           ...rawEvent,
           source: "hornslink",
-        } as unknown as IncomingEvent; // type assertion to match IncomingEvent type
+        } as unknown as IncomingEvent;
 
         const enrichedEvent = await enrichEventData(incomingEvent);
+
+        // Push to Firestore
+        logger.pipelineStep("store_event", { eventId: enrichedEvent.id });
         await pushEventToFirestore(enrichedEvent);
         successCount++;
+        logger.info(`Successfully processed event`, {
+          eventId: enrichedEvent.id,
+          title: 'content' in enrichedEvent
+            ? enrichedEvent.content?.title
+            : enrichedEvent.extractedDetails?.title ?? "unknown",
+          source: "hornslink",
+        });
       } catch (error) {
         failureCount++;
         failedEvents.push(rawEvent.id);
+        logger.error(`Failed to process event ${rawEvent.id}`, {
+          eventId: rawEvent.id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      } finally {
+        eventTimer();
       }
     }
+
+    logger.pipelineStep("complete", {
+      total: rawEvents.length,
+      success: successCount,
+      failures: failureCount,
+      failedEventIds: failedEvents,
+    });
+
+    if (failureCount > 0) {
+      logger.warn(`Pipeline completed with ${failureCount} failures`, { failureCount, failedEvents });
+    } else {
+      logger.info(`Pipeline completed successfully`, { successCount });
+    }
   } catch (error) {
-    // Pipeline error
+    logger.fatal(`Pipeline failed with critical error`, {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  } finally {
+    timer();
   }
 }
 
 export async function handleInstagramEventIngest() {
+  const timer = logger.time("handleInstagramEventIngest");
+  logger.pipelineStep("start", { source: "instagram" });
+
   let successCount = 0;
   let failureCount = 0;
   const failedEvents: string[] = [];
 
   try {
-    // now for instagram
-    // for each event, if it has an instagram handle, we want to scrape it and enrich those events as well
-    const instagramEvents = await scrapeInstagramEvents(
-      instagramHandlesToScrape,
-    );
+    logger.pipelineStep("scrape_instagram_events", { handles: instagramHandlesToScrape });
+
+    const scrapeTimer = logger.time("scrapeInstagramEvents");
+    const instagramEvents = await scrapeInstagramEvents(instagramHandlesToScrape);
+    scrapeTimer();
+
+    logger.info(`Scraped ${instagramEvents.length} events from Instagram`, {
+      operation: "scrape",
+      source: "instagram",
+      count: instagramEvents.length,
+    });
+
+    logger.pipelineStep("enrich_and_store_events", { totalEvents: instagramEvents.length });
 
     for (const instaEvent of instagramEvents) {
+      const eventTimer = logger.time(`process_instagram_event_${instaEvent.id}`);
+
       if (instaEvent.error) {
         failureCount++;
         failedEvents.push(instaEvent.id || "unknown");
+        logger.warn(`Instagram event has error, skipping`, {
+          eventId: instaEvent.id,
+          error: instaEvent.error,
+        });
+        eventTimer();
         continue;
       }
 
       try {
-        // enrich
+        logger.pipelineStep("enrich_event", { eventId: instaEvent.id });
+
         const incomingEvent: IncomingEvent = {
           source: "instagram",
           id: instaEvent.id,
@@ -98,42 +174,122 @@ export async function handleInstagramEventIngest() {
 
         const enrichedEvent = await enrichEventData(incomingEvent);
 
-        // push to firestore with a generated ID since we don't have a natural one for Instagram posts
-
+        logger.pipelineStep("store_event", { eventId: enrichedEvent.id });
         await pushEventToFirestore(enrichedEvent);
         successCount++;
+
+        logger.info(`Successfully processed Instagram event`, {
+          eventId: enrichedEvent.id,
+          extractedTitle: 'extractedDetails' in enrichedEvent
+            ? enrichedEvent.extractedDetails?.title ?? "unknown"
+            : "unknown",
+          source: "instagram",
+        });
       } catch (error) {
         failureCount++;
         failedEvents.push(instaEvent.id);
+        logger.error(`Failed to process Instagram event ${instaEvent.id}`, {
+          eventId: instaEvent.id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      } finally {
+        eventTimer();
       }
     }
+
+    logger.pipelineStep("complete", {
+      total: instagramEvents.length,
+      success: successCount,
+      failures: failureCount,
+      failedEventIds: failedEvents,
+    });
+
+    if (failureCount > 0) {
+      logger.warn(`Instagram pipeline completed with ${failureCount} failures`, { failureCount, failedEvents });
+    } else {
+      logger.info(`Instagram pipeline completed successfully`, { successCount });
+    }
   } catch (error) {
-    // Pipeline error
+    logger.fatal(`Instagram pipeline failed with critical error`, {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  } finally {
+    timer();
   }
 }
 
 export async function handleOrganizationIngest() {
-  try {
-    // scrape organizations from hornslink
-    // orgs change infrequently, we might
-    // want to make sure we don't call this too often
-    const rawOrgs = await scrapeHornsLinkOrganizations();
+  const timer = logger.time("handleOrganizationIngest");
+  logger.pipelineStep("start", { source: "hornslink", type: "organizations" });
 
-    // no need to enrich org data, just push to firestore
+  try {
+    logger.pipelineStep("scrape_hornslink_organizations");
+    const scrapeTimer = logger.time("scrapeHornsLinkOrganizations");
+    const rawOrgs = await scrapeHornsLinkOrganizations();
+    scrapeTimer();
+
+    logger.info(`Scraped ${rawOrgs.length} organizations from HornsLink`, {
+      operation: "scrape",
+      source: "hornslink",
+      type: "organizations",
+      count: rawOrgs.length,
+    });
+
+    logger.pipelineStep("store_organizations", { totalOrgs: rawOrgs.length });
+
+    let successCount = 0;
+    let skippedCount = 0;
+
     for (const rawOrg of rawOrgs) {
-      const existingDoc = await db
-        .collection("organizations")
-        .doc(`${rawOrg.id}`)
-        .get();
-      if (existingDoc.exists) {
-        continue;
+      const orgTimer = logger.time(`store_organization_${rawOrg.id}`);
+      try {
+        const existingDoc = await db
+          .collection("organizations")
+          .doc(`${rawOrg.id}`)
+          .get();
+
+        if (existingDoc.exists) {
+          logger.debug(`Organization ${rawOrg.id} already exists, skipping`, { orgId: rawOrg.id, action: "skipped" });
+          skippedCount++;
+          orgTimer();
+          continue;
+        }
+
+        logger.pipelineStep("store_organization", { orgId: rawOrg.id, orgName: rawOrg.name });
+        await pushOrganizationToFireStore({
+          ...rawOrg,
+          profilePicture: rawOrg.profilePicture ?? "",
+        });
+        successCount++;
+        logger.info(`Successfully stored organization`, { orgId: rawOrg.id, orgName: rawOrg.name });
+      } catch (error) {
+        logger.error(`Failed to store organization ${rawOrg.id}`, {
+          orgId: rawOrg.id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      } finally {
+        orgTimer();
       }
-      await pushOrganizationToFireStore({
-        ...rawOrg,
-        profilePicture: rawOrg.profilePicture ?? "",
-      });
     }
+
+    logger.pipelineStep("complete", {
+      total: rawOrgs.length,
+      success: successCount,
+      skipped: skippedCount,
+    });
+
+    logger.info(`Organization ingestion completed`, { successCount, skippedCount });
   } catch (error) {
-    // Pipeline error
+    logger.fatal(`Organization ingestion failed with critical error`, {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  } finally {
+    timer();
   }
 }

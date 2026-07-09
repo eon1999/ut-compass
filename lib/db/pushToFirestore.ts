@@ -1,4 +1,4 @@
-// this file is for setting up connection with firestore
+﻿// this file is for setting up connection with firestore
 // we'll write to firestore from the event ingestion pipeline after
 // enriching the event data with our ml service
 
@@ -8,6 +8,9 @@
 // but other sources might not so we want to be handle that gracefully
 
 import { db } from "./firebaseAdmin";
+import { getLogger } from "@/lib/logger";
+
+const logger = getLogger({ component: "db" });
 
 interface EventData {
   id: string;
@@ -40,7 +43,11 @@ interface OrganizationData {
 }
 
 export async function pushEventToFirestore(eventData: EventData) {
+  const timer = logger.time(`pushEventToFirestore_${eventData.id}`);
+  logger.dbOperation("push", "events", { eventId: eventData.id, source: eventData.source });
+
   if (!eventData.id) {
+    logger.error("Event data must have an 'id' field to be pushed to Firestore.", { eventData });
     throw new Error(
       "Event data must have an 'id' field to be pushed to Firestore.",
     );
@@ -68,21 +75,29 @@ export async function pushEventToFirestore(eventData: EventData) {
       host = `Org ID: ${eventData.organizationId}`;
     }
 
-    console.log(
+    logger.dbResult("push", "events", 1, 0, { eventId: eventData.id, title, host, source: eventData.source });
+    logger.info(
       `Event with ID ${eventData.id}, Title: ${title}, Host: ${host}, grabbed from: ${eventData.source || "unknown"} has been pushed to Firestore.`,
     );
   } catch (error) {
-    console.error(
+    logger.error(
       `Failed to push event with ID ${eventData.id} to Firestore:`,
-      error,
+      { eventId: eventData.id, error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined },
     );
+    throw error;
+  } finally {
+    timer();
   }
 }
 
 // organizations live in a different collection
 
 export async function pushOrganizationToFireStore(orgData: OrganizationData) {
+  const timer = logger.time(`pushOrganizationToFireStore_${orgData.id}`);
+  logger.dbOperation("push", "organizations", { orgId: orgData.id, orgName: orgData.name });
+
   if (!orgData.id) {
+    logger.error("Organization data must have an 'id' field to be pushed to Firestore.", { orgData });
     throw new Error(
       "Organization data must have an 'id' field to be pushed to Firestore.",
     );
@@ -93,13 +108,17 @@ export async function pushOrganizationToFireStore(orgData: OrganizationData) {
       .collection("organizations")
       .doc(orgData.id)
       .set(orgData, { merge: true });
-    console.log(
+    logger.dbResult("push", "organizations", 1, 0, { orgId: orgData.id, orgName: orgData.name });
+    logger.info(
       `Organization with ID ${orgData.id}, Name: ${orgData.name} has been pushed to Firestore.`,
     );
   } catch (error) {
-    console.error(
+    logger.error(
       `Failed to push organization with ID ${orgData.id} to Firestore:`,
-      error,
+      { orgId: orgData.id, error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined },
     );
+    throw error;
+  } finally {
+    timer();
   }
 }

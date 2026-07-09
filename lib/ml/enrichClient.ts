@@ -3,6 +3,9 @@
 
 import OpenAI from "openai";
 import { pullOrganizationsFromFirestore } from "@/lib/db/pullFromFirestore";
+import { getLogger } from "@/lib/logger";
+
+const logger = getLogger({ component: "ml" });
 
 const MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 
@@ -40,16 +43,29 @@ async function createChatCompletionWithRetries(
   let lastError: unknown;
   for (let attempt = 0; attempt <= CHAT_MAX_RETRIES; attempt++) {
     try {
-      return await client.chat.completions.create(params);
+      const timer = logger.time(`openrouter_completion_attempt_${attempt + 1}`);
+      const result = await client.chat.completions.create(params);
+      timer();
+      return result;
     } catch (e) {
       lastError = e;
       if (!isRateLimitError(e) || attempt === CHAT_MAX_RETRIES) {
+        logger.error(`OpenRouter completion failed after ${attempt + 1} attempts`, {
+          operation: "ml_inference",
+          model: MODEL,
+          attempt: attempt + 1,
+          maxRetries: CHAT_MAX_RETRIES,
+          error: e instanceof Error ? e.message : String(e),
+        });
         throw e;
       }
       const delayMs = getRetryDelayMs(e, attempt);
-      console.warn(
-        `OpenRouter rate limited (429), retry ${attempt + 1}/${CHAT_MAX_RETRIES} after ${delayMs}ms`
-      );
+      logger.warn(`OpenRouter rate limited (429), retry ${attempt + 1}/${CHAT_MAX_RETRIES} after ${delayMs}ms`, {
+        operation: "ml_inference",
+        model: MODEL,
+        attempt: attempt + 1,
+        delayMs,
+      });
       await sleep(delayMs);
     }
   }
@@ -256,7 +272,9 @@ async function getOrganizations(): Promise<{
   handleToOrgIdMap: Record<string, string>;
 }> {
   if (!cachedOrganizations || !handleToOrgIdMap) {
+    const timer = logger.time("pull_organizations_from_firestore");
     cachedOrganizations = await pullOrganizationsFromFirestore();
+    timer();
     handleToOrgIdMap = {};
 
     // Map Instagram handle -> HornsLink id key in cachedOrganizations (Firestore uses instagram_handle)
@@ -267,107 +285,127 @@ async function getOrganizations(): Promise<{
         handleToOrgIdMap[cleanHandle] = hornslinkKey;
       }
     }
+    logger.debug(`Loaded ${Object.keys(cachedOrganizations).length} organizations, ${Object.keys(handleToOrgIdMap).length} handle mappings`);
   }
   return { cachedOrganizations, handleToOrgIdMap };
 }
 
 export async function enrichEventData(incomingEvent: IncomingEvent) {
-  const { cachedOrganizations, handleToOrgIdMap } = await getOrganizations();
-  let prompt = "";
-  let organizationData: CachedOrg | null = null;
-
-  // for hornslink
-  if (incomingEvent.source === "hornslink") {
-    const orgId = incomingEvent.organization.id.replace("org_", ""); // remove the "org_" prefix to get the actual HornsLink org ID
-    organizationData = cachedOrganizations[orgId];
-    if (!organizationData) {
-      console.warn("No organization data found for HornsLink event with org ID: " + orgId);
-    }
-
-
-    prompt = `
-    You are a university event classifier. Score how well the event matches each category and major.
-    Use a number between 0.0 and 1.0 for each score (e.g. 0.85). Do NOT use 0-100 percentages or whole numbers above 1.
-    Title: ${incomingEvent.content.title}
-    Description: ${incomingEvent.content.descriptionText}
-    Organizer: ${organizationData?.name || "Unknown Organization"}
-    Organizer Description: ${organizationData?.description || "No description available."}
-    
-    Respond with exactly two top-level JSON keys: "categories" and "majors". Each value must be an object.
-    You MUST use these exact camelCase keys (spell them exactly) under "categories" and "majors", with a numeric score 0.0-1.0 for each:
-    
-    categories keys: ${EVENT_CATEGORIES.join(", ")}
-    majors keys: ${MAJOR_CATEGORIES.join(", ")}
-  `;
-  }
-
-  // for instagram
-  else if (incomingEvent.source === "instagram") {
-    const cleanHandle = incomingEvent.instagramHandle
-      .replace(/^@/, "")
-      .toLowerCase();
-    const orgId = handleToOrgIdMap[cleanHandle];
-    organizationData = orgId ? cachedOrganizations[orgId] : null;
-
-    if (!organizationData) {
-      console.warn(`No Firebase org found for handle @${cleanHandle}`);
-      // optionally throw an error here, or use a default standard
-    }
-
-    prompt = `
-      You are a university event classifier and data extractor.
-      Read the unstructured Instagram data and:
-      1) Score how well the event matches EACH category and major using a number between 0.0 and 1.0 (e.g. 0.9 for a strong match). Do NOT use 0-100 or integers above 1.
-      2) Extract 'title', 'date', 'time', 'location', and 'description' into an object "extractedDetails". Use null when unknown.
-
-      Image OCR Text: ${incomingEvent.altText}
-      Post Caption: ${incomingEvent.caption}
-      Organizer: ${organizationData?.name || incomingEvent.instagramHandle}
-      Organizer Description: ${organizationData?.description || "Unknown"}
-
-      Respond with exactly three top-level keys: "categories", "majors", "extractedDetails".
-      Under "categories" and "majors" you MUST use these exact camelCase keys with numeric scores 0.0-1.0:
-      categories: ${EVENT_CATEGORIES.join(", ")}
-      majors: ${MAJOR_CATEGORIES.join(", ")}
-    `;
-  }
-
-  // call model (retries with backoff on 429)
-  const response = await createChatCompletionWithRetries({
-    model: MODEL,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
+  const timer = logger.time(`enrich_event_${incomingEvent.id}`);
+  logger.mlInference(MODEL, incomingEvent.source === "hornslink" ? incomingEvent.content.descriptionText.length : (incomingEvent.altText?.length || 0) + (incomingEvent.caption?.length || 0), {
+    eventId: incomingEvent.id,
+    source: incomingEvent.source,
   });
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("No content received from OpenRouter");
+  try {
+    const { cachedOrganizations, handleToOrgIdMap } = await getOrganizations();
+    let prompt = "";
+    let organizationData: CachedOrg | null = null;
 
-  const parsedJson = JSON.parse(content) as unknown;
-  const root = unwrapModelJson(parsedJson);
-  const categories = parseWeightsObject(root.categories, EVENT_CATEGORIES);
-  const majors = parseWeightsObject(root.majors, MAJOR_CATEGORIES);
-  warnIfAllWeightsZero(categories, majors);
+    // for hornslink
+    if (incomingEvent.source === "hornslink") {
+      const orgId = incomingEvent.organization.id.replace("org_", ""); // remove the "org_" prefix to get the actual HornsLink org ID
+      organizationData = cachedOrganizations[orgId];
+      if (!organizationData) {
+        logger.warn("No organization data found for HornsLink event", { eventId: incomingEvent.id, orgId });
+      }
 
-  if (incomingEvent.source === "instagram") {
-    const extractedDetails = parseExtractedDetails(root);
+      prompt = `
+      You are a university event classifier. Score how well the event matches each category and major.
+      Use a number between 0.0 and 1.0 for each score (e.g. 0.85). Do NOT use 0-100 percentages or whole numbers above 1.
+      Title: ${incomingEvent.content.title}
+      Description: ${incomingEvent.content.descriptionText}
+      Organizer: ${organizationData?.name || "Unknown Organization"}
+      Organizer Description: ${organizationData?.description || "No description available."}
+
+      Respond with exactly two top-level JSON keys: "categories" and "majors". Each value must be an object.
+      You MUST use these exact camelCase keys (spell them exactly) under "categories" and "majors", with a numeric score 0.0-1.0 for each:
+
+      categories keys: ${EVENT_CATEGORIES.join(", ")}
+      majors keys: ${MAJOR_CATEGORIES.join(", ")}
+    `;
+    }
+
+    // for instagram
+    else if (incomingEvent.source === "instagram") {
+      const cleanHandle = incomingEvent.instagramHandle
+        .replace(/^@/, "")
+        .toLowerCase();
+      const orgId = handleToOrgIdMap[cleanHandle];
+      organizationData = orgId ? cachedOrganizations[orgId] : null;
+
+      if (!organizationData) {
+        logger.warn(`No Firebase org found for handle`, { handle: cleanHandle, eventId: incomingEvent.id });
+        // optionally throw an error here, or use a default standard
+      }
+
+      prompt = `
+        You are a university event classifier and data extractor.
+        Read the unstructured Instagram data and:
+        1) Score how well the event matches EACH category and major using a number between 0.0 and 1.0 (e.g. 0.9 for a strong match). Do NOT use 0-100 or integers above 1.
+        2) Extract 'title', 'date', 'time', 'location', and 'description' into an object "extractedDetails". Use null when unknown.
+
+        Image OCR Text: ${incomingEvent.altText}
+        Post Caption: ${incomingEvent.caption}
+        Organizer: ${organizationData?.name || incomingEvent.instagramHandle}
+        Organizer Description: ${organizationData?.description || "Unknown"}
+
+        Respond with exactly three top-level keys: "categories", "majors", "extractedDetails".
+        Under "categories" and "majors" you MUST use these exact camelCase keys with numeric scores 0.0-1.0:
+        categories: ${EVENT_CATEGORIES.join(", ")}
+        majors: ${MAJOR_CATEGORIES.join(", ")}
+      `;
+    }
+
+    // call model (retries with backoff on 429)
+    const response = await createChatCompletionWithRetries({
+      model: MODEL,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("No content received from OpenRouter");
+
+    const parsedJson = JSON.parse(content) as unknown;
+    const root = unwrapModelJson(parsedJson);
+    const categories = parseWeightsObject(root.categories, EVENT_CATEGORIES);
+    const majors = parseWeightsObject(root.majors, MAJOR_CATEGORIES);
+    warnIfAllWeightsZero(categories, majors);
+
+    logger.mlResult(MODEL, [...Object.keys(categories), ...Object.keys(majors)], 0, {
+      eventId: incomingEvent.id,
+      source: incomingEvent.source,
+      categoryCount: Object.keys(categories).length,
+      majorCount: Object.keys(majors).length,
+    });
+
+    if (incomingEvent.source === "instagram") {
+      const extractedDetails = parseExtractedDetails(root);
+      timer();
+      return {
+        ...incomingEvent,
+        organizationId: organizationData?.id ?? null,
+        extractedDetails,
+        weights: {
+          categories,
+          majors,
+          model: MODEL,
+        },
+      };
+    }
+
+    timer();
     return {
       ...incomingEvent,
-      organizationId: organizationData?.id ?? null,
-      extractedDetails,
       weights: {
         categories,
         majors,
         model: MODEL,
       },
     };
+  } catch (error) {
+    timer();
+    throw error;
   }
-
-  return {
-    ...incomingEvent,
-    weights: {
-      categories,
-      majors,
-      model: MODEL,
-    },
-  };
 }
